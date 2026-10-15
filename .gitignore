@@ -35,5 +35,7 @@ dist-ssr
 *.tmp
 *.bak
 scratch/
+tmp/
 
 .vercel
+
