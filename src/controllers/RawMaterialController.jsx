@@ -3,7 +3,7 @@ import { rawMaterialsService } from '../services/rawMaterialsService';
 import { stockLogsService } from '../services/stockLogsService';
 import { opnameReportsService } from '../services/opnameReportsService';
 import { getLocalDateStr, formatDateIndonesian } from '../utils/dateUtils';
-import { subscribeToTable } from '../lib/supabase';
+import { subscribeToTable } from '../lib/database';
 import { useUnit } from './UnitController';
 import { useAuth } from './AuthController';
 import { stripBranchFromId } from '../models/BranchModel';
@@ -33,7 +33,7 @@ export const RawMaterialProvider = ({ children }) => {
     (items || []).map(item => withActiveBranch(item))
   ), [withActiveBranch]);
 
-  // 1. Cloud Database State via Supabase
+  // 1. Cloud Database State via MySQL
   const [rawMaterials, setRawMaterials] = useState([]);
   const [stockLogs, setStockLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -189,7 +189,7 @@ export const RawMaterialProvider = ({ children }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Fetch all materials, stock logs, and stock opname daily reports from Supabase
+  // Fetch all materials, stock logs, and stock opname daily reports from MySQL
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -212,26 +212,26 @@ export const RawMaterialProvider = ({ children }) => {
         setStockLogs(logsRes.data || []);
       }
 
-      // Synchronize Daily Opname Reports (Supabase Cloud + LocalStorage Fallback)
+      // Synchronize Daily Opname Reports (MySQL Cloud + LocalStorage Fallback)
       if (opnameRes.data) {
         setDailyOpnameReports(prevLocal => {
           const remoteReports = opnameRes.data || [];
           const mergedMap = new Map();
 
-          // 1. Load all remote reports from Supabase cloud
+          // 1. Load all remote reports from MySQL cloud
           remoteReports.forEach(r => {
             if (r && r.id) mergedMap.set(r.id, r);
             else if (r && r.date) mergedMap.set(`date-${r.date}`, r);
           });
 
-          // 2. Keep local reports not yet in remote, and sync them to Supabase in the background
+          // 2. Keep local reports not yet in remote, and sync them to MySQL in the background
           (prevLocal || []).forEach(localR => {
             if (!localR) return;
             const key = localR.id || `date-${localR.date}`;
             if (!mergedMap.has(key)) {
               mergedMap.set(key, localR);
               opnameReportsService.saveOpnameReport({ ...localR, branchId: activeBranchId }).catch(e => {
-                console.warn('Background sync of local opname report to Supabase:', e);
+                console.warn('Background sync of local opname report to MySQL:', e);
               });
             }
           });
@@ -306,7 +306,7 @@ export const RawMaterialProvider = ({ children }) => {
             if (!mergedMap.has(key)) {
               mergedMap.set(key, localR);
               opnameReportsService.saveOpnameReport({ ...localR, branchId: activeBranchId }).catch(e => {
-                console.warn('Background sync of local opname report to Supabase:', e);
+                console.warn('Background sync of local opname report to MySQL:', e);
               });
             }
           });
@@ -344,6 +344,10 @@ export const RawMaterialProvider = ({ children }) => {
 
   const handleStockLogRealtimeChange = useCallback(async (payload) => {
     const eventType = payload?.eventType;
+    if (eventType === 'POLL') {
+      await fetchMaterialsAndReports();
+      return;
+    }
     const newRow = payload?.new;
     const oldRow = payload?.old;
     const rowBranchId = newRow?.branch_id || oldRow?.branch_id || activeBranchId;
@@ -381,14 +385,10 @@ export const RawMaterialProvider = ({ children }) => {
   useEffect(() => {
     fetchData();
 
-    const channel1 = subscribeToTable('raw_materials', () => {
-      fetchMaterialsAndReports();
-    });
-    const channel2 = subscribeToTable('inventory_stock_logs', handleStockLogRealtimeChange);
+    const channel = subscribeToTable('inventory', handleStockLogRealtimeChange);
 
     return () => {
-      if (channel1) channel1.unsubscribe();
-      if (channel2) channel2.unsubscribe();
+      if (channel) channel.unsubscribe();
     };
   }, [fetchData, fetchMaterialsAndReports, handleStockLogRealtimeChange]);
 
@@ -1389,9 +1389,9 @@ export const RawMaterialProvider = ({ children }) => {
       return updated;
     });
 
-    // Persist to Supabase Cloud Database for cross-device/browser synchronization
+    // Persist to MySQL Cloud Database for cross-device/browser synchronization
     opnameReportsService.saveOpnameReport(newReport).catch(err => {
-      console.error('Failed saving daily opname report to Supabase:', err);
+      console.error('Failed saving daily opname report to MySQL:', err);
     });
 
     showToast(`Store Closing berhasil! Laporan Stock Opname hari ini telah dikirim ke Superadmin.`, 'success', 'Store Closing Berhasil');
@@ -1487,12 +1487,12 @@ export const RawMaterialProvider = ({ children }) => {
         console.error('Failed saving opname item update:', e);
       }
 
-      // Sync changes to Supabase cloud
+      // Sync changes to MySQL cloud
       if (updated) {
         const targetReport = updated.find(r => r.id === reportId || (!reportId && r.date === todayStr));
         if (targetReport) {
           opnameReportsService.saveOpnameReport({ ...targetReport, branchId: targetReport.branchId || activeBranchId }).catch(err => {
-            console.error('Failed updating opname report in Supabase:', err);
+            console.error('Failed updating opname report in MySQL:', err);
           });
         }
       }
@@ -1528,11 +1528,11 @@ export const RawMaterialProvider = ({ children }) => {
         localStorage.setItem(DAILY_REPORTS_STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {}
 
-      // Delete/reopen in Supabase cloud
+      // Delete/reopen in MySQL cloud
       const targetId = reportId || (target ? target.id : null);
       if (targetId) {
         opnameReportsService.deleteOpnameReport(targetId).catch(err => {
-          console.error('Failed deleting opname report from Supabase on reopen:', err);
+          console.error('Failed deleting opname report from MySQL on reopen:', err);
         });
       }
 
@@ -1610,9 +1610,9 @@ export const RawMaterialProvider = ({ children }) => {
         return updated;
       });
 
-      // Update applied status in Supabase cloud
+      // Update applied status in MySQL cloud
       opnameReportsService.saveOpnameReport({ ...appliedReport, branchId: appliedReport.branchId || activeBranchId }).catch(err => {
-        console.error('Failed updating appliedToInventory in Supabase:', err);
+        console.error('Failed updating appliedToInventory in MySQL:', err);
       });
 
       showToast(`Berhasil menerapkan penyesuaian ${adjustments.length} bahan baku ke sistem.`, 'success', 'Sinkronisasi Berhasil');
@@ -1685,12 +1685,12 @@ export const RawMaterialProvider = ({ children }) => {
         }
       });
 
-      // Update Supabase in batch if configured
+      // Update MySQL in batch if configured
       if (stockUpdates.length > 0) {
-        await rawMaterialsService.updateStocksBatch(stockUpdates, activeBranchId).catch(e => console.warn('Supabase stock update error:', e));
+        await rawMaterialsService.updateStocksBatch(stockUpdates, activeBranchId).catch(e => console.warn('MySQL stock update error:', e));
       }
       if (newLogs.length > 0) {
-        await stockLogsService.createStockLogsBatch(withActiveBranchBatch(newLogs)).catch(e => console.warn('Supabase stock logs error:', e));
+        await stockLogsService.createStockLogsBatch(withActiveBranchBatch(newLogs)).catch(e => console.warn('MySQL stock logs error:', e));
       }
 
       setRawMaterials(updatedMaterials);

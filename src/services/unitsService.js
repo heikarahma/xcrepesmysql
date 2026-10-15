@@ -1,11 +1,11 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'units';
 
 export const unitsService = {
   async getUnits() {
-    if (!isSupabaseConfigured()) return { data: [], error: null };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: [], error: null };
+    const { data, error } = await database
       .from(TABLE)
       .select('*')
       .order('created_at', { ascending: false });
@@ -27,7 +27,7 @@ export const unitsService = {
   },
 
   async createUnit({ id, name }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const payload = {
       id,
       name,
@@ -35,7 +35,7 @@ export const unitsService = {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .insert([payload])
       .select()
@@ -58,8 +58,8 @@ export const unitsService = {
   },
 
   async updateUnit(id, { name }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
+    const { data, error } = await database
       .from(TABLE)
       .update({
         name,
@@ -86,8 +86,8 @@ export const unitsService = {
   },
 
   async deleteUnit(id) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .eq('id', id);
@@ -99,8 +99,8 @@ export const unitsService = {
   },
 
   async deleteUnitsBatch(ids) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .in('id', ids);

@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'inventory_stock_logs';
 const DEFAULT_BRANCH_ID = 'BR-DEFAULT';
@@ -52,7 +52,7 @@ const fetchStockLogsPaged = async (branchId, includeBranchFilter = true) => {
   let from = 0;
 
   while (true) {
-    let query = supabase
+    let query = database
       .from(TABLE)
       .select(STOCK_LOG_COLUMNS)
       .neq('type', 'OPNAME_REPORT')
@@ -134,7 +134,7 @@ const fetchStockLogsPage = async ({ branchId, page = 1, pageSize = 10, filters =
   const from = (safePage - 1) * safePageSize;
   const to = from + safePageSize - 1;
 
-  let query = supabase
+  let query = database
     .from(TABLE)
     .select(STOCK_LOG_COLUMNS, { count: 'exact' })
     .neq('type', 'OPNAME_REPORT')
@@ -149,7 +149,7 @@ const fetchStockLogsPage = async ({ branchId, page = 1, pageSize = 10, filters =
 
 export const stockLogsService = {
   async getStockLogs(branchId = DEFAULT_BRANCH_ID) {
-    if (!isSupabaseConfigured()) return { data: [], error: null };
+    if (!isDatabaseConfigured()) return { data: [], error: null };
     let { data, error } = await fetchStockLogsPaged(branchId, true);
 
     if (error && (error.code === 'PGRST204' || String(error.message || '').includes('branch_id'))) {
@@ -170,7 +170,7 @@ export const stockLogsService = {
   },
 
   async getStockLogsPage({ branchId = DEFAULT_BRANCH_ID, page = 1, pageSize = 10, filters = {} } = {}) {
-    if (!isSupabaseConfigured()) return { data: [], count: 0, error: null };
+    if (!isDatabaseConfigured()) return { data: [], count: 0, error: null };
     let { data, error, count } = await fetchStockLogsPage({
       branchId,
       page,
@@ -205,10 +205,10 @@ export const stockLogsService = {
   },
 
   async getStockLogById(id) {
-    if (!isSupabaseConfigured()) return { data: null, error: null };
+    if (!isDatabaseConfigured()) return { data: null, error: null };
     if (!id) return { data: null, error: new Error('Stock log id is required') };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .select(STOCK_LOG_COLUMNS)
       .eq('id', id)
@@ -226,7 +226,7 @@ export const stockLogsService = {
   },
 
   async createStockLog(log) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const payload = {
       id: log.id,
       raw_material_id: log.rawMaterialId,
@@ -249,7 +249,7 @@ export const stockLogsService = {
       created_at: log.createdAt || new Date().toISOString()
     };
 
-    let { data, error } = await supabase
+    let { data, error } = await database
       .from(TABLE)
       .insert([payload])
       .select()
@@ -257,7 +257,7 @@ export const stockLogsService = {
 
     if (error && (error.code === 'PGRST204' || String(error.message || '').includes('branch_id'))) {
       const { branch_id, ...fallbackPayload } = payload;
-      const retry = await supabase
+      const retry = await database
         .from(TABLE)
         .insert([fallbackPayload])
         .select()
@@ -275,7 +275,7 @@ export const stockLogsService = {
   },
 
   async createStockLogsBatch(logs) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     if (!Array.isArray(logs) || logs.length === 0) return { data: [], error: null };
 
     const payloads = logs.map(log => ({
@@ -300,12 +300,12 @@ export const stockLogsService = {
       created_at: log.createdAt || new Date().toISOString()
     }));
 
-    let { data, error } = await supabase
+    let { data, error } = await database
       .from(TABLE)
       .insert(payloads);
 
     if (error && (error.code === 'PGRST204' || String(error.message || '').includes('branch_id'))) {
-      const retry = await supabase
+      const retry = await database
         .from(TABLE)
         .insert(payloads.map(({ branch_id, ...payload }) => payload));
       data = retry.data;

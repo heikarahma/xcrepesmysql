@@ -1,0 +1,7 @@
+database_backup/
+output/
+docs/
+scripts/
+database/
+*.sql
+netlify.toml

@@ -1,9 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
+import 'dotenv/config';
 
-const SOURCE_URL = 'https://bdxzxiwtvpeglgicwwav.supabase.co';
-const SOURCE_KEY = 'sb_publishable_lg2qeUc9J928QhBvmnl1OA_uiO-qEb-';
+const SOURCE_URL = process.env.SUPABASE_URL;
+const SOURCE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!SOURCE_URL || !SOURCE_KEY) {
+  throw new Error('Isi SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY (atau SUPABASE_ANON_KEY) di .env.');
+}
 
 const supabase = createClient(SOURCE_URL, SOURCE_KEY);
 

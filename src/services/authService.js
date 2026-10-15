@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'superadmin_profile';
 const SUPERADMIN_ID = 'usr_superadmin';
@@ -7,14 +7,14 @@ const DEFAULT_SUPERADMIN = {
   id: 'usr_superadmin',
   nama: 'Super Admin',
   username: 'superadmin',
-  password: 'superadminxcrepes123*',
+  password: '',
   role: 'superadmin'
 };
 
 export const authService = {
   async getSuperAdminProfile() {
-    if (!isSupabaseConfigured()) return { data: DEFAULT_SUPERADMIN, error: null };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: DEFAULT_SUPERADMIN, error: null };
+    const { data, error } = await database
       .from(TABLE)
       .select('*')
       .eq('id', SUPERADMIN_ID)
@@ -34,7 +34,7 @@ export const authService = {
         id: data.id,
         nama: data.nama || DEFAULT_SUPERADMIN.nama,
         username: data.username || DEFAULT_SUPERADMIN.username,
-        password: data.password || DEFAULT_SUPERADMIN.password,
+        password: '',
         role: 'superadmin'
       },
       error: null
@@ -42,7 +42,7 @@ export const authService = {
   },
 
   async saveSuperAdminProfile(profile) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const payload = {
       id: SUPERADMIN_ID,
       nama: profile.nama,
@@ -52,7 +52,7 @@ export const authService = {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .upsert(payload)
       .select()

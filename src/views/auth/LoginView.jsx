@@ -27,13 +27,13 @@ export const LoginView = () => {
   const appDisplayName = settings.appName || settings.storeName || 'XCrepes POS';
   const appTagline = settings.storeTagline || 'Sistem Kasir & Point of Sale Modern';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
     setIsLoading(true);
 
-    setTimeout(() => {
-      const result = login(username, password);
+    try {
+      const result = await login(username, password);
       if (!result.success) {
         setErrorMessage(result.error || 'Login gagal. Periksa username dan kata sandi.');
         setIsLoading(false);
@@ -44,7 +44,10 @@ export const LoginView = () => {
         }
         setIsLoading(false);
       }
-    }, 350); // micro-delay for smooth transition
+    } catch (error) {
+      setErrorMessage(error.message || 'Login gagal. Periksa koneksi server.');
+      setIsLoading(false);
+    }
   };
 
   return (

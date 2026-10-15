@@ -82,7 +82,7 @@ export const CategoryReorderModal = () => {
     setDraggedIndex(null);
   };
 
-  // Save changes to Supabase and Context
+  // Save changes to MySQL and Context
   const handleSave = async () => {
     setIsSaving(true);
     try {

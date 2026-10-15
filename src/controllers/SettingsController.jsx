@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { settingsService } from '../services/settingsService';
-import { subscribeToTable } from '../lib/supabase';
+import { subscribeToTable } from '../lib/database';
 import { useUnit } from './UnitController';
 
 const SettingsContext = createContext();
@@ -46,7 +46,7 @@ export const SettingsProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch settings from Supabase
+  // Fetch settings from MySQL
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -55,7 +55,7 @@ export const SettingsProvider = ({ children }) => {
         setSettings({ ...data, paperSize: '58mm' });
       }
     } catch (e) {
-      console.error('Failed to fetch settings from Supabase:', e);
+      console.error('Failed to fetch settings from MySQL:', e);
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +73,12 @@ export const SettingsProvider = ({ children }) => {
     };
   }, [fetchSettings]);
 
-  // Update Settings in Supabase
+  useEffect(() => {
+    const storeTitle = String(settings.storeName || settings.appName || 'PosQue').trim();
+    document.title = storeTitle || 'PosQue';
+  }, [settings.storeName, settings.appName]);
+
+  // Update Settings in MySQL
   const updateSettings = async (newValues) => {
     const updated = { ...settings, ...newValues, paperSize: '58mm' };
     setSettings(updated);

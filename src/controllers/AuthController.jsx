@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { cashiersService } from '../services/cashiersService';
 import { authService } from '../services/authService';
 import { branchesService } from '../services/branchesService';
-import { subscribeToTable } from '../lib/supabase';
+import { clearSessionToken, hasFreshSessionToken, loginToDatabase, setSessionToken, subscribeToTable } from '../lib/database';
 import { 
   AUTH_USER_STORAGE_KEY, 
   DEFAULT_SUPERADMIN, 
@@ -29,6 +29,7 @@ export const AuthProvider = ({ children }) => {
   // 1. Current Authenticated User Session (Session state in localStorage)
   const [currentUser, setCurrentUser] = useState(() => {
     try {
+      if (!hasFreshSessionToken()) return null;
       const saved = localStorage.getItem(AUTH_USER_STORAGE_KEY);
       if (!saved) return null;
       return JSON.parse(saved);
@@ -38,10 +39,10 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
-  // 2. Super Admin Profile (Cloud Database via Supabase)
+  // 2. Super Admin Profile (Cloud Database via MySQL)
   const [superAdminProfile, setSuperAdminProfile] = useState(DEFAULT_SUPERADMIN);
 
-  // 3. Cashiers List (Cloud Database via Supabase)
+  // 3. Cashiers List (Cloud Database via MySQL)
   const [cashiers, setCashiers] = useState([]);
   const [branches, setBranches] = useState([DEFAULT_BRANCH]);
   const [pendingLoginUser, setPendingLoginUser] = useState(null);
@@ -68,13 +69,18 @@ export const AuthProvider = ({ children }) => {
   const openProfileModal = () => setIsProfileModalOpen(true);
   const closeProfileModal = () => setIsProfileModalOpen(false);
 
-  // Fetch profiles and cashier accounts from Supabase
+  // Fetch profiles and cashier accounts from MySQL
   const fetchAuthData = useCallback(async () => {
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
+      const canManageAccounts = hasAdminPrivileges(currentUser.role);
       const [adminRes, cashiersRes, branchesRes] = await Promise.all([
-        authService.getSuperAdminProfile(),
-        cashiersService.getCashiers(),
+        canManageAccounts ? authService.getSuperAdminProfile() : Promise.resolve({ data: null, error: null }),
+        canManageAccounts ? cashiersService.getCashiers() : Promise.resolve({ data: [], error: null }),
         branchesService.getBranches()
       ]);
 
@@ -90,31 +96,28 @@ export const AuthProvider = ({ children }) => {
         setBranches(branchesRes.data);
       }
     } catch (e) {
-      console.error('Failed to fetch auth data from Supabase:', e);
+      console.error('Failed to fetch auth data from MySQL:', e);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
+    if (!currentUser) {
+      setIsLoading(false);
+      return undefined;
+    }
+
     fetchAuthData();
 
-    const channel1 = subscribeToTable('superadmin_profile', () => {
-      fetchAuthData();
-    });
-    const channel2 = subscribeToTable('cashier_accounts', () => {
-      fetchAuthData();
-    });
-    const channel3 = subscribeToTable('store_branches', () => {
+    const channel = subscribeToTable('auth', () => {
       fetchAuthData();
     });
 
     return () => {
-      if (channel1) channel1.unsubscribe();
-      if (channel2) channel2.unsubscribe();
-      if (channel3) channel3.unsubscribe();
+      if (channel) channel.unsubscribe();
     };
-  }, [fetchAuthData]);
+  }, [currentUser, fetchAuthData]);
 
   // Save auth user to localStorage when session changes
   useEffect(() => {
@@ -128,6 +131,15 @@ export const AuthProvider = ({ children }) => {
       console.error('Gagal menyimpan sesi login', e);
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    const handleExpiredSession = () => {
+      setCurrentUser(null);
+      setPendingLoginUser(null);
+    };
+    window.addEventListener('xcrepes:session-expired', handleExpiredSession);
+    return () => window.removeEventListener('xcrepes:session-expired', handleExpiredSession);
+  }, []);
 
   // -------------------------------------------------------------
   // AUTHENTICATION LOGIC
@@ -171,7 +183,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [currentUser, getAccessibleBranchesForUser]);
 
-  const login = (usernameInput, passwordInput) => {
+  const login = async (usernameInput, passwordInput) => {
     const trimmedUser = (usernameInput || '').trim();
     const trimmedPass = (passwordInput || '').trim();
 
@@ -179,69 +191,34 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Username dan kata sandi wajib diisi.' };
     }
 
-    // A. Cek Kredensial Super Admin
-    if (
-      trimmedUser.toLowerCase() === superAdminProfile.username.toLowerCase() &&
-      trimmedPass === superAdminProfile.password
-    ) {
-      const superAdminUser = {
-        id: superAdminProfile.id,
-        nama: superAdminProfile.nama,
-        username: superAdminProfile.username,
-        role: 'superadmin',
-        branchIds: [],
-        loggedInAt: new Date().toISOString()
-      };
-      const options = getAccessibleBranchesForUser(superAdminUser);
-      if (options.length > 1) {
-        setPendingLoginUser(superAdminUser);
-        return { success: true, requiresBranchSelection: true, user: superAdminUser, branches: options };
-      }
-      return completeLoginWithBranch(superAdminUser, options[0]);
+    const { data, error } = await loginToDatabase(trimmedUser, trimmedPass);
+    if (error || !data?.token || !data?.user) {
+      return { success: false, error: error?.message || 'Login gagal. Periksa koneksi server.' };
     }
 
-    // B. Cek Kredensial Kasir dari database cloud
-    const matchedCashier = cashiers.find(
-      c => c.username.toLowerCase() === trimmedUser.toLowerCase()
-    );
-
-    if (!matchedCashier) {
-      return { success: false, error: 'Username atau kata sandi tidak sesuai.' };
-    }
-
-    if (matchedCashier.password !== trimmedPass) {
-      return { success: false, error: 'Username atau kata sandi tidak sesuai.' };
-    }
-
-    if (matchedCashier.isActive === false) {
-      return { 
-        success: false, 
-        error: 'Akun kasir ini sedang dinonaktifkan. Silakan hubungi Super Admin.' 
-      };
-    }
-
-    const isMatchedAdmin = hasAdminPrivileges(matchedCashier.role);
-    const cashierUser = {
-      id: matchedCashier.id,
-      nama: matchedCashier.nama,
-      username: matchedCashier.username,
-      role: matchedCashier.role || 'kasir',
-      permissions: isMatchedAdmin 
-        ? NAV_FEATURES.map(f => f.key) 
-        : Array.from(new Set([...(matchedCashier.permissions || []), 'stock-opname'])),
-      branchIds: normalizeBranchIds(matchedCashier.branchIds),
-      loggedInAt: new Date().toISOString()
+    setSessionToken(data.token);
+    const loginBranches = Array.isArray(data.branches) && data.branches.length > 0 ? data.branches : [DEFAULT_BRANCH];
+    setBranches(loginBranches);
+    const isMatchedAdmin = hasAdminPrivileges(data.user.role);
+    const loginUser = {
+      ...data.user,
+      permissions: isMatchedAdmin
+        ? NAV_FEATURES.map(f => f.key)
+        : Array.from(new Set([...(data.user.permissions || []), 'stock-opname'])),
+      branchIds: normalizeBranchIds(data.user.branchIds)
     };
-
-    const options = getAccessibleBranchesForUser(cashierUser);
+    const options = isMatchedAdmin || loginUser.branchIds.length === 0
+      ? loginBranches.filter(branch => branch.isActive !== false)
+      : loginBranches.filter(branch => branch.isActive !== false && loginUser.branchIds.includes(branch.id));
     if (options.length === 0) {
+      clearSessionToken();
       return { success: false, error: 'Akun ini belum memiliki akses ke cabang aktif. Silakan hubungi Admin.' };
     }
     if (options.length > 1) {
-      setPendingLoginUser(cashierUser);
-      return { success: true, requiresBranchSelection: true, user: cashierUser, branches: options };
+      setPendingLoginUser(loginUser);
+      return { success: true, requiresBranchSelection: true, user: loginUser, branches: options };
     }
-    return completeLoginWithBranch(cashierUser, options[0]);
+    return completeLoginWithBranch(loginUser, options[0]);
   };
 
   const selectBranchForPendingLogin = (branchId) => {
@@ -257,6 +234,7 @@ export const AuthProvider = ({ children }) => {
 
   const cancelBranchSelection = () => {
     setPendingLoginUser(null);
+    clearSessionToken();
   };
 
   const switchActiveBranch = (branchId) => {
@@ -275,6 +253,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setCurrentUser(null);
     setPendingLoginUser(null);
+    clearSessionToken();
     try {
       localStorage.removeItem(AUTH_USER_STORAGE_KEY);
     } catch (e) {
@@ -379,16 +358,16 @@ export const AuthProvider = ({ children }) => {
     const trimmedUser = (username || '').trim().toLowerCase();
     const trimmedPass = (password || '').trim();
 
+    const existingAccount = cashiers.find(c => c.id === id);
+
     if (!trimmedNama) return { success: false, error: 'Nama akun wajib diisi.' };
     if (!trimmedUser) return { success: false, error: 'Username login wajib diisi.' };
-    if (!trimmedPass) return { success: false, error: 'Kata sandi wajib diisi.' };
 
     if (trimmedUser === superAdminProfile.username.toLowerCase()) {
       return { success: false, error: 'Username tersebut khusus Super Admin.' };
     }
 
     // Cek apakah akun yang ingin diubah adalah akun Kepala Toko
-    const existingAccount = cashiers.find(c => c.id === id);
     if (existingAccount && hasAdminPrivileges(existingAccount.role) && currentUser?.role !== ROLES.SUPERADMIN) {
       return { 
         success: false, 
@@ -421,7 +400,7 @@ export const AuthProvider = ({ children }) => {
       const { data: updatedRecord, error } = await cashiersService.updateCashier(id, {
         nama: trimmedNama,
         username: trimmedUser,
-        password: trimmedPass,
+        ...(trimmedPass ? { password: trimmedPass } : {}),
         role,
         permissions: assignedPermissions,
         branchIds: assignedBranches,

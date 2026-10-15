@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { unitsService } from '../services/unitsService';
-import { subscribeToTable, isSupabaseConfigured } from '../lib/supabase';
+import { subscribeToTable, isDatabaseConfigured } from '../lib/database';
 import { useUI } from './UIController';
+import { useAuth } from './AuthController';
 
 const UnitContext = createContext();
 
@@ -18,8 +19,9 @@ export const useUnitController = useUnit;
 export const UnitProvider = ({ children }) => {
   // Toast remains available here for older modules; navigation lives in UIController.
   const { showToast } = useUI();
+  const { currentUser } = useAuth();
 
-  // 1. Master Units State (Cloud Database via Supabase)
+  // 1. Master Units State (Cloud Database via MySQL)
   const [units, setUnits] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -49,7 +51,7 @@ export const UnitProvider = ({ children }) => {
     isBatch: false
   });
 
-  // Fetch Units from Supabase
+  // Fetch Units from MySQL
   const fetchUnits = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -70,6 +72,10 @@ export const UnitProvider = ({ children }) => {
 
   // Initial fetch and Realtime sync
   useEffect(() => {
+    if (!currentUser) {
+      setIsLoading(false);
+      return undefined;
+    }
     fetchUnits();
 
     // Subscribe to real-time changes
@@ -80,7 +86,7 @@ export const UnitProvider = ({ children }) => {
     return () => {
       if (channel) channel.unsubscribe();
     };
-  }, [fetchUnits]);
+  }, [currentUser, fetchUnits]);
 
   // Reset pagination when search changes
   useEffect(() => {

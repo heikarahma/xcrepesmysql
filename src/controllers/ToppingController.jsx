@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { toppingsService } from '../services/toppingsService';
-import { subscribeToTable } from '../lib/supabase';
+import { subscribeToTable } from '../lib/database';
 import { useUnit } from './UnitController';
 import { useRawMaterial } from './RawMaterialController';
 import { useAuth } from './AuthController';
@@ -24,7 +24,7 @@ export const ToppingProvider = ({ children }) => {
   const { currentUser } = useAuth();
   const activeBranchId = currentUser?.activeBranchId || 'BR-DEFAULT';
 
-  // 1. Cloud Database State via Supabase
+  // 1. Cloud Database State via MySQL
   const [toppings, setToppings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,7 +54,7 @@ export const ToppingProvider = ({ children }) => {
     isBatch: false
   });
 
-  // Fetch Toppings from Supabase
+  // Fetch Toppings from MySQL
   const fetchToppings = useCallback(async () => {
     setIsLoading(true);
     setError(null);

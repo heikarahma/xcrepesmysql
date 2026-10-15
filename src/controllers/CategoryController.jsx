@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { categoriesService } from '../services/categoriesService';
-import { subscribeToTable } from '../lib/supabase';
+import { subscribeToTable } from '../lib/database';
 import { useUnit } from './UnitController';
 
 const CategoryContext = createContext();
@@ -20,7 +20,7 @@ export const CategoryProvider = ({ children }) => {
 
   const CATEGORY_ORDER_STORAGE_KEY = 'xcrepes_category_order';
 
-  // 1. Master Categories State (Cloud Database via Supabase)
+  // 1. Master Categories State (Cloud Database via MySQL)
   const [categories, setCategories] = useState([]);
   const [categoryOrder, setCategoryOrder] = useState(() => {
     try {
@@ -64,7 +64,7 @@ export const CategoryProvider = ({ children }) => {
   const openReorderModal = () => setIsReorderModalOpen(true);
   const closeReorderModal = () => setIsReorderModalOpen(false);
 
-  // Fetch Categories & Custom Order from Supabase
+  // Fetch Categories & Custom Order from MySQL
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -98,16 +98,12 @@ export const CategoryProvider = ({ children }) => {
   useEffect(() => {
     fetchCategories();
 
-    const channel1 = subscribeToTable('categories', () => {
-      fetchCategories();
-    });
-    const channel2 = subscribeToTable('inventory_stock_logs', () => {
+    const channel = subscribeToTable('categories', () => {
       fetchCategories();
     });
 
     return () => {
-      if (channel1) channel1.unsubscribe();
-      if (channel2) channel2.unsubscribe();
+      if (channel) channel.unsubscribe();
     };
   }, [fetchCategories]);
 
@@ -275,7 +271,7 @@ export const CategoryProvider = ({ children }) => {
     try {
       await categoriesService.saveCategoryOrder(newOrderArray);
     } catch (err) {
-      console.warn('Failed saving category order to Supabase:', err);
+      console.warn('Failed saving category order to MySQL:', err);
     }
 
     showToast('Urutan kategori berhasil disimpan & disinkronkan.', 'success', 'Urutan Diperbarui');

@@ -32,7 +32,7 @@ export const DEFAULT_SUPERADMIN = {
   id: 'usr_superadmin',
   nama: 'Super Admin',
   username: 'superadmin',
-  password: 'superadminxcrepes123*',
+  password: '',
   role: 'superadmin'
 };
 

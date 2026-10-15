@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { ordersService } from '../services/ordersService';
-import { subscribeToTable } from '../lib/supabase';
+import { subscribeToTable } from '../lib/database';
 import { 
   DEFAULT_DISCOUNT_PRESETS,
   calculateItemDiscount,
@@ -42,7 +42,7 @@ export const OrderProvider = ({ children }) => {
   const { settings } = useSettings();
   const activeBranchId = currentUser?.activeBranchId || 'BR-DEFAULT';
 
-  // 1. Cloud Database State via Supabase (Historical Completed Orders)
+  // 1. Cloud Database State via MySQL (Historical Completed Orders)
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -136,7 +136,7 @@ export const OrderProvider = ({ children }) => {
     }
   }, [activeBranchId]);
 
-  // Fetch Orders from Supabase
+  // Fetch Orders from MySQL
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -201,6 +201,10 @@ export const OrderProvider = ({ children }) => {
 
   const handleOrderRealtimeChange = useCallback(async (payload) => {
     const eventType = payload?.eventType;
+    if (eventType === 'POLL') {
+      await fetchOrders();
+      return;
+    }
     const newRow = payload?.new;
     const oldRow = payload?.old;
     const rowBranchId = newRow?.branch_id || oldRow?.branch_id || activeBranchId;
@@ -227,7 +231,7 @@ export const OrderProvider = ({ children }) => {
     if (data) {
       upsertOrderInState(data);
     }
-  }, [activeBranchId, upsertOrderInState]);
+  }, [activeBranchId, fetchOrders, upsertOrderInState]);
 
   const resolveOrderForAction = useCallback(async (orderId) => {
     const localOrder = orders.find(o => o.id === orderId || o.invoiceNumber === orderId);
@@ -607,7 +611,7 @@ export const OrderProvider = ({ children }) => {
     setCompletedReceipt(null);
   };
 
-  // Complete Order (Commit to Supabase cloud)
+  // Complete Order (Commit to MySQL cloud)
   const completeOrder = async ({ paymentMethod = 'cash', cashReceived = 0, changeAmount = 0 }) => {
     const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
     const cashierDisplayName = currentUser?.nama || currentUser?.name || 'Kasir';
@@ -802,7 +806,7 @@ export const OrderProvider = ({ children }) => {
         newOrderStatus = targetOrder.status === 'returned' ? 'completed' : (targetOrder.status || 'completed');
       }
 
-      // 4. Update in Supabase cloud
+      // 4. Update in MySQL cloud
       const payload = {
         items: updatedItems,
         status: newOrderStatus,
@@ -973,7 +977,7 @@ export const OrderProvider = ({ children }) => {
         return_note: combinedNotes
       };
 
-      // 2. Update in Supabase
+      // 2. Update in MySQL
       const { error: updateErr } = await ordersService.updateOrder(originalOrder.id, payload);
       if (updateErr) {
         showToast(`Gagal merevisi transaksi di database: ${updateErr.message}`, 'error', 'Error Database');

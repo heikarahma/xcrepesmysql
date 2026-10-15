@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Database, AlertCircle, X, ExternalLink } from 'lucide-react';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { Database, X } from 'lucide-react';
+import { isDatabaseConfigured } from '../../lib/database';
 
-export const SupabaseConfigBanner = () => {
+export const MySQLConfigBanner = () => {
   const [dismissed, setDismissed] = useState(false);
 
-  if (isSupabaseConfigured() || dismissed) {
+  if (isDatabaseConfigured() || dismissed) {
     return null;
   }
 
@@ -16,9 +16,9 @@ export const SupabaseConfigBanner = () => {
           <Database size={20} color="#ffffff" />
         </div>
         <div style={styles.textContainer}>
-          <strong style={styles.title}>Konfigurasi Supabase PostgreSQL Diperlukan</strong>
+          <strong style={styles.title}>Konfigurasi API MySQL diperlukan</strong>
           <span style={styles.subtitle}>
-            Aplikasi telah siap menggunakan database cloud. Masukkan <code>VITE_SUPABASE_URL</code> dan <code>VITE_SUPABASE_ANON_KEY</code> pada file <code>.env</code> Anda, lalu jalankan script <code>supabase_schema.sql</code> di Supabase SQL Editor.
+            Isi credential MySQL server-side, lalu jalankan <code>npm run db:setup</code>. Jangan menaruh password database pada variabel <code>VITE_*</code>.
           </span>
         </div>
       </div>

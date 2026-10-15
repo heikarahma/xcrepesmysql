@@ -31,7 +31,7 @@ import { Navbar } from './views/components/Navbar';
 import { ToastContainer } from './views/components/Toast';
 import { SystemLoadingModal } from './views/components/SystemLoadingModal';
 import { ImagePreviewModal } from './views/components/ImagePreviewModal';
-import { SupabaseConfigBanner } from './views/components/SupabaseConfigBanner';
+import { MySQLConfigBanner } from './views/components/MySQLConfigBanner';
 import { TableSkeleton, CardSkeleton, InlineSpinner } from './views/components/LoadingSkeleton';
 
 // Helper to lazily load named exports
@@ -198,7 +198,7 @@ function MainLayout() {
 
       {/* Main Content Area */}
       <div className="app-main">
-        <SupabaseConfigBanner />
+        <MySQLConfigBanner />
         <Navbar />
         
         <main className={`app-content ${activeMenu === 'returns' ? 'app-content-returns' : ''}`}>
@@ -326,28 +326,38 @@ function SystemLoadingGate() {
   return <SystemLoadingModal isOpen={isLoadingPreview || showLoadingModal} />;
 }
 
+function AuthenticatedDataApp() {
+  const { currentUser } = useAuth();
+
+  if (!currentUser) return <AuthenticatedApp />;
+
+  return (
+    <CategoryProvider>
+        <RawMaterialProvider>
+          <StockOpnameProvider>
+            <ToppingProvider>
+              <ProductMenuProvider>
+                <OrderProvider>
+                  <ReportProvider>
+                    <AuthenticatedApp />
+                    <SystemLoadingGate />
+                  </ReportProvider>
+                </OrderProvider>
+              </ProductMenuProvider>
+            </ToppingProvider>
+          </StockOpnameProvider>
+        </RawMaterialProvider>
+    </CategoryProvider>
+  );
+}
+
 function App() {
   return (
     <UIProvider>
       <AuthProvider>
         <UnitProvider>
           <SettingsProvider>
-            <CategoryProvider>
-              <RawMaterialProvider>
-                <StockOpnameProvider>
-                  <ToppingProvider>
-                    <ProductMenuProvider>
-                      <OrderProvider>
-                        <ReportProvider>
-                          <AuthenticatedApp />
-                          <SystemLoadingGate />
-                        </ReportProvider>
-                      </OrderProvider>
-                    </ProductMenuProvider>
-                  </ToppingProvider>
-                </StockOpnameProvider>
-              </RawMaterialProvider>
-            </CategoryProvider>
+            <AuthenticatedDataApp />
           </SettingsProvider>
         </UnitProvider>
       </AuthProvider>

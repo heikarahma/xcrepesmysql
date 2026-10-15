@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'store_settings';
 const DEFAULT_SETTINGS_ID = 'store_default';
@@ -66,7 +66,7 @@ const saveLocalTaxSettings = (taxSettings) => {
 export const settingsService = {
   async getSettings() {
     const localTax = getLocalTaxSettings();
-    if (!isSupabaseConfigured()) {
+    if (!isDatabaseConfigured()) {
       return { 
         data: {
           ...DEFAULT_SETTINGS,
@@ -76,7 +76,7 @@ export const settingsService = {
       };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .select('*')
       .eq('id', DEFAULT_SETTINGS_ID)
@@ -140,7 +140,7 @@ export const settingsService = {
       taxName: settings.taxName
     });
 
-    if (!isSupabaseConfigured()) {
+    if (!isDatabaseConfigured()) {
       return { data: settings, error: null };
     }
 
@@ -176,16 +176,16 @@ export const settingsService = {
     };
 
     // Attempt to upsert with full payload
-    let { data, error } = await supabase
+    let { data, error } = await database
       .from(TABLE)
       .upsert(fullPayload)
       .select()
       .single();
 
-    // Fallback if tax columns don't exist yet in Supabase schema cache
+    // Fallback if tax columns don't exist yet in MySQL schema cache
     if (error && (error.code === 'PGRST204' || String(error.message).includes('column'))) {
       console.warn('Tax columns not in remote store_settings table schema yet. Falling back to base payload:', error.message);
-      const retry = await supabase
+      const retry = await database
         .from(TABLE)
         .upsert(basePayload)
         .select()

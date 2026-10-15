@@ -70,7 +70,7 @@ export const CashierFormModal = () => {
       if (mode === 'edit' && cashier) {
         setNama(cashier.nama || '');
         setUsername(cashier.username || '');
-        setPassword(cashier.password || '');
+        setPassword('');
         setPermissions(Array.isArray(cashier.permissions) ? cashier.permissions : ['kasir', 'raw-material', 'stock-opname', 'returns']);
         setBranchIds(Array.isArray(cashier.branchIds) ? cashier.branchIds : []);
         setIsActive(cashier.isActive !== false);
@@ -115,9 +115,9 @@ export const CashierFormModal = () => {
     } else if (username.trim().toLowerCase() === 'superadmin') {
       err.username = 'Username "superadmin" khusus untuk Super Admin!';
     }
-    if (!password.trim()) {
+    if (!isEdit && !password.trim()) {
       err.password = 'Kata sandi wajib diisi!';
-    } else if (password.trim().length < 4) {
+    } else if (password.trim() && password.trim().length < 4) {
       err.password = 'Kata sandi minimal 4 karakter!';
     }
     if (role === 'kasir' && permissions.length === 0) {
@@ -266,7 +266,7 @@ export const CashierFormModal = () => {
             variant="primary"
             icon={isEdit ? Save : Plus}
             onClick={handleSubmit}
-            disabled={isSubmitting || !nama.trim() || !username.trim() || !password.trim()}
+            disabled={isSubmitting || !nama.trim() || !username.trim() || (!isEdit && !password.trim())}
           >
             {isSubmitting 
               ? 'Menyimpan...' 
@@ -391,7 +391,7 @@ export const CashierFormModal = () => {
           {/* Password with Eye Button */}
           <div className="blue-input-group">
             <label className="blue-label">
-              Kata Sandi <span style={{ color: 'var(--red-500)' }}>*</span>
+              Kata Sandi {!isEdit && <span style={{ color: 'var(--red-500)' }}>*</span>}
             </label>
             <div className="blue-input-wrapper" style={{ position: 'relative' }}>
               <div className="blue-input-icon">
@@ -404,10 +404,10 @@ export const CashierFormModal = () => {
                   setPassword(e.target.value);
                   if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
                 }}
-                placeholder="Masukkan kata sandi"
+                placeholder={isEdit ? 'Kosongkan jika tidak ingin mengganti' : 'Masukkan kata sandi'}
                 className={`blue-input with-icon ${errors.password ? 'has-error' : ''}`}
                 style={{ paddingRight: '40px' }}
-                required
+                required={!isEdit}
               />
               <button
                 type="button"

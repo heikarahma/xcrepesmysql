@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { opnameReportsService } from '../services/opnameReportsService';
 import { useRawMaterial } from './RawMaterialController';
 import { useAuth } from './AuthController';
-import { subscribeToTable, isSupabaseConfigured } from '../lib/supabase';
+import { subscribeToTable, isDatabaseConfigured } from '../lib/database';
 import { getLocalDateStr, formatDateIndonesian } from '../utils/dateUtils';
 import { toast } from '../views/components/Toast';
 
@@ -92,13 +92,13 @@ export const StockOpnameProvider = ({ children }) => {
 
     // Setup realtime subscription
     const unsubscribe = subscribeToTable('inventory_stock_logs', (payload) => {
-      if (payload?.new?.type === 'OPNAME_REPORT' || payload?.old?.type === 'OPNAME_REPORT') {
+      if (payload?.eventType === 'POLL' || payload?.new?.type === 'OPNAME_REPORT' || payload?.old?.type === 'OPNAME_REPORT') {
         fetchReports();
       }
     });
 
     return () => {
-      if (typeof unsubscribe === 'function') unsubscribe();
+      if (unsubscribe) unsubscribe.unsubscribe();
     };
   }, [fetchReports]);
 
@@ -682,7 +682,7 @@ export const StockOpnameProvider = ({ children }) => {
         auditTrail: [...(report.auditTrail || []), auditEntry]
       };
 
-      // 4. Save updated report in Supabase / service
+      // 4. Save updated report in MySQL / service
       await opnameReportsService.saveOpnameReport(appliedReport, false);
 
       // 5. Clear draft for that date so kasir cannot edit

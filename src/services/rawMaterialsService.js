@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 import { DEFAULT_BRANCH_ID, isRowForBranch, formatBranchRowId, stripBranchFromId } from '../models/BranchModel';
 
 const TABLE = 'raw_materials';
@@ -33,8 +33,8 @@ const mapMaterialRow = (row, stockOverride = null, branchId = DEFAULT_BRANCH_ID)
 
 export const rawMaterialsService = {
   async getRawMaterials(branchId = DEFAULT_BRANCH_ID) {
-    if (!isSupabaseConfigured()) return { data: [], error: null };
-    const query = supabase
+    if (!isDatabaseConfigured()) return { data: [], error: null };
+    const query = database
       .from(TABLE)
       .select('*')
       .order('created_at', { ascending: false });
@@ -50,7 +50,7 @@ export const rawMaterialsService = {
 
     let stockMap = new Map();
     if (branchId) {
-      const { data: stockRows, error: stockErr } = await supabase
+      const { data: stockRows, error: stockErr } = await database
         .from(STOCK_TABLE)
         .select('raw_material_id, stock')
         .eq('branch_id', branchId);
@@ -74,7 +74,7 @@ export const rawMaterialsService = {
   },
 
   async createRawMaterial({ id, name, unitName, stock = 0, pricePerUnit = 0, minStock = 10, note = '', branchId = DEFAULT_BRANCH_ID }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const finalId = formatBranchRowId(id, branchId);
 
     const payload = {
@@ -89,7 +89,7 @@ export const rawMaterialsService = {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .insert([payload])
       .select()
@@ -111,7 +111,7 @@ export const rawMaterialsService = {
   },
 
   async copyFromBranch(sourceBranchId = DEFAULT_BRANCH_ID, targetBranchId) {
-    if (!isSupabaseConfigured()) return { count: 0, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { count: 0, error: new Error('MySQL not configured') };
     if (!targetBranchId || targetBranchId === sourceBranchId) return { count: 0, error: null };
 
     const { data: sourceMaterials, error: fetchErr } = await this.getRawMaterials(sourceBranchId);
@@ -134,7 +134,7 @@ export const rawMaterialsService = {
       };
     });
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .upsert(payloads)
       .select();
@@ -148,7 +148,7 @@ export const rawMaterialsService = {
   },
 
   async updateRawMaterial(id, { name, unitName, stock, pricePerUnit, minStock, note, branchId = DEFAULT_BRANCH_ID }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const updatePayload = {
       updated_at: new Date().toISOString()
     };
@@ -159,7 +159,7 @@ export const rawMaterialsService = {
     if (minStock !== undefined) updatePayload.min_stock = Number(minStock) || 10;
     if (note !== undefined) updatePayload.note = note;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .update(updatePayload)
       .eq('id', id)
@@ -182,7 +182,7 @@ export const rawMaterialsService = {
   },
 
   async updateStock(id, newStock, branchId = DEFAULT_BRANCH_ID) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
 
     if (branchId) {
       const stockPayload = {
@@ -192,7 +192,7 @@ export const rawMaterialsService = {
         updated_at: new Date().toISOString()
       };
 
-      const { error: stockErr } = await supabase
+      const { error: stockErr } = await database
         .from(STOCK_TABLE)
         .upsert(stockPayload, { onConflict: 'branch_id,raw_material_id' });
 
@@ -206,7 +206,7 @@ export const rawMaterialsService = {
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .update({
         stock: Number(newStock) || 0,
@@ -228,7 +228,7 @@ export const rawMaterialsService = {
   },
 
   async updateStocksBatch(updates, branchId = DEFAULT_BRANCH_ID) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
     if (branchId) {
       const payloads = updates.map(u => ({
         branch_id: branchId,
@@ -237,7 +237,7 @@ export const rawMaterialsService = {
         updated_at: new Date().toISOString()
       }));
 
-      const { error } = await supabase
+      const { error } = await database
         .from(STOCK_TABLE)
         .upsert(payloads, { onConflict: 'branch_id,raw_material_id' });
 
@@ -248,7 +248,7 @@ export const rawMaterialsService = {
     }
 
     const promises = updates.map(u => 
-      supabase
+      database
         .from(TABLE)
         .update({
           stock: Number(u.stock) || 0,
@@ -263,8 +263,8 @@ export const rawMaterialsService = {
   },
 
   async deleteRawMaterial(id) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .eq('id', id);
@@ -276,8 +276,8 @@ export const rawMaterialsService = {
   },
 
   async deleteRawMaterialsBatch(ids) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .in('id', ids);

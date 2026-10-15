@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 import { DEFAULT_BRANCH_ID, isRowForBranch, formatBranchRowId, stripBranchFromId } from '../models/BranchModel';
 
 const TABLE = 'product_menus';
@@ -29,8 +29,8 @@ const mapRow = (row, branchId = DEFAULT_BRANCH_ID) => ({
 
 export const productMenusService = {
   async getProductMenus(branchId = DEFAULT_BRANCH_ID) {
-    if (!isSupabaseConfigured()) return { data: [], error: null };
-    const query = supabase
+    if (!isDatabaseConfigured()) return { data: [], error: null };
+    const query = database
       .from(TABLE)
       .select('*')
       .order('created_at', { ascending: false });
@@ -51,7 +51,7 @@ export const productMenusService = {
   },
 
   async createProductMenu(menu, branchId = DEFAULT_BRANCH_ID) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const targetBranchId = menu.branchId || branchId || DEFAULT_BRANCH_ID;
     const finalId = formatBranchRowId(menu.id, targetBranchId);
 
@@ -71,7 +71,7 @@ export const productMenusService = {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .insert([payload])
       .select()
@@ -89,7 +89,7 @@ export const productMenusService = {
   },
 
   async copyFromBranch(sourceBranchId = DEFAULT_BRANCH_ID, targetBranchId) {
-    if (!isSupabaseConfigured()) return { count: 0, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { count: 0, error: new Error('MySQL not configured') };
     if (!targetBranchId || targetBranchId === sourceBranchId) return { count: 0, error: null };
 
     const { data: sourceMenus, error: fetchErr } = await this.getProductMenus(sourceBranchId);
@@ -116,7 +116,7 @@ export const productMenusService = {
       };
     });
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .upsert(payloads)
       .select();
@@ -130,7 +130,7 @@ export const productMenusService = {
   },
 
   async updateProductMenu(id, menu) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const payload = {
       updated_at: new Date().toISOString()
     };
@@ -145,7 +145,7 @@ export const productMenusService = {
     if (menu.toppings !== undefined) payload.toppings = menu.toppings;
     if (menu.isActive !== undefined) payload.is_active = menu.isActive !== false;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .update(payload)
       .eq('id', id)
@@ -164,8 +164,8 @@ export const productMenusService = {
   },
 
   async deleteProductMenu(id) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { data, error } = await database
       .from(TABLE)
       .update({
         is_active: false,
@@ -183,8 +183,8 @@ export const productMenusService = {
   },
 
   async activateProductMenu(id) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { data, error } = await database
       .from(TABLE)
       .update({
         is_active: true,
@@ -202,8 +202,8 @@ export const productMenusService = {
   },
 
   async deleteProductMenusBatch(ids) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .update({
         is_active: false,

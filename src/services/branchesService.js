@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 import { DEFAULT_BRANCH } from '../models/BranchModel';
 
 const TABLE = 'store_branches';
@@ -35,11 +35,11 @@ const writeLocalBranches = (branches) => {
 
 export const branchesService = {
   async getBranches() {
-    if (!isSupabaseConfigured()) {
+    if (!isDatabaseConfigured()) {
       return { data: readLocalBranches(), error: null };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .select('*')
       .order('created_at', { ascending: true });
@@ -65,13 +65,13 @@ export const branchesService = {
       updated_at: new Date().toISOString()
     };
 
-    if (!isSupabaseConfigured()) {
+    if (!isDatabaseConfigured()) {
       const next = [mapRow(payload), ...readLocalBranches()];
       writeLocalBranches(next);
       return { data: mapRow(payload), error: null };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .insert([payload])
       .select()
@@ -93,7 +93,7 @@ export const branchesService = {
     if (branch.phone !== undefined) payload.phone = branch.phone;
     if (branch.isActive !== undefined) payload.is_active = branch.isActive;
 
-    if (!isSupabaseConfigured()) {
+    if (!isDatabaseConfigured()) {
       const next = readLocalBranches().map((item) => (
         item.id === id
           ? { ...item, ...branch, updatedAt: payload.updated_at }
@@ -103,7 +103,7 @@ export const branchesService = {
       return { data: next.find((item) => item.id === id), error: null };
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .update(payload)
       .eq('id', id)

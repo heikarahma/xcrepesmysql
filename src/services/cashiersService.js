@@ -1,11 +1,11 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'cashier_accounts';
 
 export const cashiersService = {
   async getCashiers() {
-    if (!isSupabaseConfigured()) return { data: [], error: null };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: [], error: null };
+    const { data, error } = await database
       .from(TABLE)
       .select('*')
       .order('created_at', { ascending: false });
@@ -20,7 +20,7 @@ export const cashiersService = {
         id: row.id,
         nama: row.nama,
         username: row.username,
-        password: row.password,
+        password: '',
         role: row.role || 'kasir',
         permissions: Array.isArray(row.permissions) ? row.permissions : [],
         branchIds: Array.isArray(row.branch_ids) ? row.branch_ids : [],
@@ -33,7 +33,7 @@ export const cashiersService = {
   },
 
   async createCashier(cashier) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const payload = {
       id: cashier.id,
       nama: cashier.nama,
@@ -47,7 +47,7 @@ export const cashiersService = {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .insert([payload])
       .select()
@@ -63,7 +63,7 @@ export const cashiersService = {
         id: data.id,
         nama: data.nama,
         username: data.username,
-        password: data.password,
+        password: '',
         role: data.role,
         permissions: data.permissions || [],
         branchIds: data.branch_ids || [],
@@ -76,7 +76,7 @@ export const cashiersService = {
   },
 
   async updateCashier(id, cashier) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const payload = {
       updated_at: new Date().toISOString()
     };
@@ -88,7 +88,7 @@ export const cashiersService = {
     if (cashier.branchIds !== undefined) payload.branch_ids = cashier.branchIds;
     if (cashier.isActive !== undefined) payload.is_active = cashier.isActive;
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .update(payload)
       .eq('id', id)
@@ -105,7 +105,7 @@ export const cashiersService = {
         id: data.id,
         nama: data.nama,
         username: data.username,
-        password: data.password,
+        password: '',
         role: data.role,
         permissions: data.permissions || [],
         branchIds: data.branch_ids || [],
@@ -118,8 +118,8 @@ export const cashiersService = {
   },
 
   async deleteCashier(id) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .eq('id', id);

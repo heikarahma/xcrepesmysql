@@ -1,11 +1,11 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'categories';
 
 export const categoriesService = {
   async getCategories() {
-    if (!isSupabaseConfigured()) return { data: [], error: null };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: [], error: null };
+    const { data, error } = await database
       .from(TABLE)
       .select('*')
       .order('created_at', { ascending: false });
@@ -28,7 +28,7 @@ export const categoriesService = {
   },
 
   async createCategory({ id, name, description = '' }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const payload = {
       id,
       name,
@@ -37,7 +37,7 @@ export const categoriesService = {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .insert([payload])
       .select()
@@ -61,8 +61,8 @@ export const categoriesService = {
   },
 
   async updateCategory(id, { name, description = '' }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
+    const { data, error } = await database
       .from(TABLE)
       .update({
         name,
@@ -91,8 +91,8 @@ export const categoriesService = {
   },
 
   async deleteCategory(id) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .eq('id', id);
@@ -104,8 +104,8 @@ export const categoriesService = {
   },
 
   async deleteCategoriesBatch(ids) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .in('id', ids);
@@ -117,12 +117,12 @@ export const categoriesService = {
   },
 
   /**
-   * Fetch category custom display order from Supabase.
+   * Fetch category custom display order from MySQL.
    */
   async getCategoryOrder() {
-    if (!isSupabaseConfigured()) return { data: null, error: null };
+    if (!isDatabaseConfigured()) return { data: null, error: null };
     try {
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('inventory_stock_logs')
         .select('*')
         .eq('id', 'CONFIG-CATEGORY-ORDER')
@@ -149,10 +149,10 @@ export const categoriesService = {
   },
 
   /**
-   * Save category custom display order to Supabase.
+   * Save category custom display order to MySQL.
    */
   async saveCategoryOrder(orderIds) {
-    if (!isSupabaseConfigured() || !Array.isArray(orderIds)) return { data: null, error: null };
+    if (!isDatabaseConfigured() || !Array.isArray(orderIds)) return { data: null, error: null };
     try {
       const payload = {
         id: 'CONFIG-CATEGORY-ORDER',
@@ -166,7 +166,7 @@ export const categoriesService = {
         created_at: new Date().toISOString()
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await database
         .from('inventory_stock_logs')
         .upsert([payload])
         .select()

@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 import { DEFAULT_BRANCH_ID, isRowForBranch, formatBranchRowId, stripBranchFromId } from '../models/BranchModel';
 
 const TABLE = 'toppings';
@@ -31,8 +31,8 @@ const saveLocalToppingReceiptSetting = (toppingId, showOnReceipt) => {
 export const toppingsService = {
   async getToppings(branchId = DEFAULT_BRANCH_ID) {
     const localReceiptMap = getLocalToppingReceiptSettings();
-    if (!isSupabaseConfigured()) return { data: [], error: null };
-    const query = supabase
+    if (!isDatabaseConfigured()) return { data: [], error: null };
+    const query = database
       .from(TABLE)
       .select('*')
       .order('created_at', { ascending: false });
@@ -67,7 +67,7 @@ export const toppingsService = {
   },
 
   async createTopping({ id, name, price = 0, description = '', ingredients = [], showOnReceipt = true, branchId = DEFAULT_BRANCH_ID }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     
     const finalId = formatBranchRowId(id, branchId);
     saveLocalToppingReceiptSetting(finalId, showOnReceipt);
@@ -87,14 +87,14 @@ export const toppingsService = {
       show_on_receipt: Boolean(showOnReceipt !== false)
     };
 
-    let { data, error } = await supabase
+    let { data, error } = await database
       .from(TABLE)
       .insert([fullPayload])
       .select()
       .single();
 
     if (error && (error.code === 'PGRST204' || String(error.message).includes('column'))) {
-      const retry = await supabase
+      const retry = await database
         .from(TABLE)
         .insert([basePayload])
         .select()
@@ -127,7 +127,7 @@ export const toppingsService = {
   },
 
   async copyFromBranch(sourceBranchId = DEFAULT_BRANCH_ID, targetBranchId) {
-    if (!isSupabaseConfigured()) return { count: 0, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { count: 0, error: new Error('MySQL not configured') };
     if (!targetBranchId || targetBranchId === sourceBranchId) return { count: 0, error: null };
 
     const { data: sourceToppings, error: fetchErr } = await this.getToppings(sourceBranchId);
@@ -148,7 +148,7 @@ export const toppingsService = {
       };
     });
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .upsert(payloads)
       .select();
@@ -162,7 +162,7 @@ export const toppingsService = {
   },
 
   async updateTopping(id, { name, price, description, ingredients, showOnReceipt }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     
     if (showOnReceipt !== undefined) {
       saveLocalToppingReceiptSetting(id, showOnReceipt);
@@ -181,7 +181,7 @@ export const toppingsService = {
       ...(showOnReceipt !== undefined ? { show_on_receipt: Boolean(showOnReceipt) } : {})
     };
 
-    let { data, error } = await supabase
+    let { data, error } = await database
       .from(TABLE)
       .update(fullPayload)
       .eq('id', id)
@@ -189,7 +189,7 @@ export const toppingsService = {
       .single();
 
     if (error && (error.code === 'PGRST204' || String(error.message).includes('column'))) {
-      const retry = await supabase
+      const retry = await database
         .from(TABLE)
         .update(payload)
         .eq('id', id)
@@ -220,8 +220,8 @@ export const toppingsService = {
   },
 
   async deleteTopping(id) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .eq('id', id);
@@ -233,8 +233,8 @@ export const toppingsService = {
   },
 
   async deleteToppingsBatch(ids) {
-    if (!isSupabaseConfigured()) return { error: new Error('Supabase not configured') };
-    const { error } = await supabase
+    if (!isDatabaseConfigured()) return { error: new Error('MySQL not configured') };
+    const { error } = await database
       .from(TABLE)
       .delete()
       .in('id', ids);

@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'inventory_stock_logs';
 const OPNAME_TYPE = 'OPNAME_REPORT';
@@ -6,7 +6,7 @@ const DEFAULT_BRANCH_ID = 'BR-DEFAULT';
 
 export const opnameReportsService = {
   /**
-   * Fetch all daily stock opname reports from Supabase.
+   * Fetch all daily stock opname reports from MySQL.
    * Reports are stored with type 'OPNAME_REPORT' and their complete data in 'note' (JSON).
    */
   async getOpnameReports(branchId = DEFAULT_BRANCH_ID) {
@@ -16,10 +16,10 @@ export const opnameReportsService = {
       if (saved) localReports = JSON.parse(saved);
     } catch (e) {}
 
-    if (!isSupabaseConfigured()) return { data: localReports, error: null };
+    if (!isDatabaseConfigured()) return { data: localReports, error: null };
 
     try {
-      let query = supabase
+      let query = database
         .from(TABLE)
         .select('*')
         .eq('type', OPNAME_TYPE);
@@ -29,7 +29,7 @@ export const opnameReportsService = {
       let { data, error } = await query.order('created_at', { ascending: false });
 
       if (error && (error.code === 'PGRST204' || String(error.message || '').includes('branch_id'))) {
-        const retry = await supabase
+        const retry = await database
           .from(TABLE)
           .select('*')
           .eq('type', OPNAME_TYPE)
@@ -106,7 +106,7 @@ export const opnameReportsService = {
    * Fetch a single opname report by its exact date string (YYYY-MM-DD).
    */
   async getOpnameReportByDate(dateStr, branchId = DEFAULT_BRANCH_ID) {
-    if (!isSupabaseConfigured() || !dateStr) return { data: null, error: null };
+    if (!isDatabaseConfigured() || !dateStr) return { data: null, error: null };
 
     try {
       const { data: allReports, error } = await this.getOpnameReports(branchId);
@@ -173,7 +173,7 @@ export const opnameReportsService = {
         console.warn('LocalStorage save error:', lsErr);
       }
 
-      if (!isSupabaseConfigured()) {
+      if (!isDatabaseConfigured()) {
         return { data: fullReport, error: null };
       }
 
@@ -190,7 +190,7 @@ export const opnameReportsService = {
         created_at: fullReport.createdAt || new Date().toISOString()
       };
 
-      let { data, error } = await supabase
+      let { data, error } = await database
         .from(TABLE)
         .upsert([payload])
         .select()
@@ -198,7 +198,7 @@ export const opnameReportsService = {
 
       if (error && (error.code === 'PGRST204' || String(error.message || '').includes('branch_id'))) {
         const { branch_id, ...fallbackPayload } = payload;
-        const retry = await supabase
+        const retry = await database
           .from(TABLE)
           .upsert([fallbackPayload])
           .select()
@@ -223,7 +223,7 @@ export const opnameReportsService = {
    * Cancel/Void an opname report without deleting audit trail history.
    */
   async voidOpnameReport(reportId, reason, user = { name: 'Admin', role: 'superadmin' }) {
-    if (!isSupabaseConfigured() || !reportId) {
+    if (!isDatabaseConfigured() || !reportId) {
       return { data: null, error: new Error('Missing reportId') };
     }
 
@@ -267,13 +267,13 @@ export const opnameReportsService = {
   },
 
   /**
-   * Delete an opname report from Supabase (for backward compatibility).
+   * Delete an opname report from MySQL (for backward compatibility).
    */
   async deleteOpnameReport(reportId) {
-    if (!isSupabaseConfigured() || !reportId) return { data: null, error: null };
+    if (!isDatabaseConfigured() || !reportId) return { data: null, error: null };
 
     try {
-      const { error } = await supabase
+      const { error } = await database
         .from(TABLE)
         .delete()
         .eq('id', reportId)

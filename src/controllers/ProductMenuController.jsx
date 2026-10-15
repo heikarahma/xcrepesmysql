@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { productMenusService } from '../services/productMenusService';
-import { subscribeToTable } from '../lib/supabase';
+import { subscribeToTable } from '../lib/database';
 import { useUnit } from './UnitController';
 import { useRawMaterial } from './RawMaterialController';
 import { useAuth } from './AuthController';
@@ -24,7 +24,7 @@ export const ProductMenuProvider = ({ children }) => {
   const { currentUser } = useAuth();
   const activeBranchId = currentUser?.activeBranchId || 'BR-DEFAULT';
 
-  // 1. Cloud Database State via Supabase
+  // 1. Cloud Database State via MySQL
   const [productMenus, setProductMenus] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -51,7 +51,7 @@ export const ProductMenuProvider = ({ children }) => {
     item: null
   });
 
-  // Fetch Product Menus from Supabase
+  // Fetch Product Menus from MySQL
   const fetchProductMenus = useCallback(async () => {
     setIsLoading(true);
     setError(null);

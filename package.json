@@ -7,18 +7,24 @@
     "dev": "vite",
     "dev:host": "vite --host 0.0.0.0 --port 5174",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:setup": "node scripts/setup-mysql.mjs",
+    "db:migrate": "node scripts/migrate-supabase-to-mysql.mjs",
+    "dev:vercel": "npx vercel dev"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.116.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^18.0.8",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.16.0",
+    "mysql2": "^3.24.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.2"
   }

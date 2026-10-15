@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'orders';
 const DEFAULT_BRANCH_ID = 'BR-DEFAULT';
@@ -98,7 +98,7 @@ const fetchOrdersPaged = async (branchId, includeBranchFilter = true) => {
   let from = 0;
 
   while (true) {
-    let query = supabase
+    let query = database
       .from(TABLE)
       .select(ORDER_COLUMNS)
       .order('date', { ascending: false })
@@ -175,7 +175,7 @@ const fetchOrdersPage = async ({ branchId, page = 1, pageSize = 10, filters = {}
   const from = (safePage - 1) * safePageSize;
   const to = from + safePageSize - 1;
 
-  let query = supabase
+  let query = database
     .from(TABLE)
     .select(ORDER_COLUMNS, { count: 'exact' })
     .order('date', { ascending: false })
@@ -189,7 +189,7 @@ const fetchOrdersPage = async ({ branchId, page = 1, pageSize = 10, filters = {}
 
 export const ordersService = {
   async getOrders(branchId = DEFAULT_BRANCH_ID) {
-    if (!isSupabaseConfigured()) return { data: [], error: null };
+    if (!isDatabaseConfigured()) return { data: [], error: null };
     let { data, error } = await fetchOrdersPaged(branchId, true);
 
     if (error && (error.code === 'PGRST204' || String(error.message || '').includes('branch_id'))) {
@@ -210,7 +210,7 @@ export const ordersService = {
   },
 
   async getOrdersPage({ branchId = DEFAULT_BRANCH_ID, page = 1, pageSize = 10, filters = {} } = {}) {
-    if (!isSupabaseConfigured()) return { data: [], count: 0, error: null };
+    if (!isDatabaseConfigured()) return { data: [], count: 0, error: null };
     let { data, error, count } = await fetchOrdersPage({
       branchId,
       page,
@@ -245,10 +245,10 @@ export const ordersService = {
   },
 
   async getOrderById(id) {
-    if (!isSupabaseConfigured()) return { data: null, error: null };
+    if (!isDatabaseConfigured()) return { data: null, error: null };
     if (!id) return { data: null, error: new Error('Order id is required') };
 
-    const { data, error } = await supabase
+    const { data, error } = await database
       .from(TABLE)
       .select(ORDER_COLUMNS)
       .eq('id', id)
@@ -266,7 +266,7 @@ export const ordersService = {
   },
 
   async createOrder(order) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const basePayload = {
       id: order.id,
       invoice_number: order.invoiceNumber,
@@ -304,7 +304,7 @@ export const ordersService = {
       tax_name: order.taxName || 'Pajak'
     };
 
-    let { data, error } = await supabase
+    let { data, error } = await database
       .from(TABLE)
       .insert([fullPayload])
       .select()
@@ -313,7 +313,7 @@ export const ordersService = {
     // Fallback if newer columns don't exist in remote orders table
     if (error && (error.code === 'PGRST204' || String(error.message).includes('column'))) {
       const { branch_id, ...fallbackBasePayload } = basePayload;
-      const retry = await supabase
+      const retry = await database
         .from(TABLE)
         .insert([fallbackBasePayload])
         .select()
@@ -360,8 +360,8 @@ export const ordersService = {
   },
 
   async updateOrderReturn(id, { reason, note, photo, user }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
+    const { data, error } = await database
       .from(TABLE)
       .update({
         status: 'returned',
@@ -384,8 +384,8 @@ export const ordersService = {
   },
 
   async cancelOrder(id, { reason, note, user }) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
+    const { data, error } = await database
       .from(TABLE)
       .update({
         status: 'cancelled',
@@ -407,8 +407,8 @@ export const ordersService = {
   },
 
   async updateOrder(id, payload) {
-    if (!isSupabaseConfigured()) return { data: null, error: new Error('Supabase not configured') };
-    const { data, error } = await supabase
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
+    const { data, error } = await database
       .from(TABLE)
       .update(payload)
       .eq('id', id)
