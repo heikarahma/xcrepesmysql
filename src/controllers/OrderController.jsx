@@ -13,6 +13,7 @@ import { useTopping } from './ToppingController';
 import { useUnit } from './UnitController';
 import { useAuth } from './AuthController';
 import { useSettings } from './SettingsController';
+import { stripImagesFromTransactionItems } from '../utils/imageCompression';
 
 const OrderContext = createContext();
 
@@ -625,12 +626,12 @@ export const OrderProvider = ({ children }) => {
       cashierName: cashierDisplayName,
       customerName: customerName.trim() || 'Pelanggan Umum',
       tableNumber: tableNumber && tableNumber.trim() && tableNumber.trim() !== '-' ? tableNumber.trim() : 'Dine In',
-      items: safeCart.map(item => ({
+      items: stripImagesFromTransactionItems(safeCart.map(item => ({
         ...item,
         lineGross: item.unitPrice * item.quantity,
         lineDiscount: item.itemDiscountAmount || 0,
         lineTotal: (item.unitPrice * item.quantity) - (item.itemDiscountAmount || 0)
-      })),
+      }))),
       subtotal: grossSubtotal,
       itemsDiscountTotal,
       orderDiscountType,

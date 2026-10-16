@@ -39,8 +39,8 @@ export const ReportProvider = ({ children }) => {
     activeMenu === 'reports-sales-summary' ||
     activeMenu === 'reports-sales-transactions' ||
     activeMenu === 'reports-materials';
-  const { orders = [], refetchAll: refetchAllOrders } = useOrder();
-  const { rawMaterials = [], stockLogs = [], fetchAllStockLogs } = useRawMaterial();
+  const { fetchOrdersPage } = useOrder();
+  const { rawMaterials = [], fetchStockLogsPage } = useRawMaterial();
   const { productMenus = [] } = useProductMenu();
   const { toppings = [] } = useTopping();
   const { settings = {} } = useSettings();
@@ -67,20 +67,8 @@ export const ReportProvider = ({ children }) => {
   const [materialSearchTerm, setMaterialSearchTerm] = useState('');
   const [materialIdFilter, setMaterialIdFilter] = useState('ALL');
   const [materialEventTypeFilter, setMaterialEventTypeFilter] = useState('ALL'); // 'ALL' | 'SALE' | 'MANUAL_OUT' | 'ADJUST'
-
-  useEffect(() => {
-    if (!isReportRoute || activeReportTab !== 'sales') return;
-    if (typeof refetchAllOrders === 'function') {
-      refetchAllOrders();
-    }
-  }, [isReportRoute, activeReportTab, refetchAllOrders]);
-
-  useEffect(() => {
-    if (!isReportRoute || activeReportTab !== 'materials') return;
-    if (typeof fetchAllStockLogs === 'function') {
-      fetchAllStockLogs();
-    }
-  }, [isReportRoute, activeReportTab, fetchAllStockLogs]);
+  const [reportOrders, setReportOrders] = useState([]);
+  const [reportStockLogs, setReportStockLogs] = useState([]);
 
   // Helper: Date Bounds Calculator
   const getDateBounds = (preset) => {
@@ -134,6 +122,73 @@ export const ReportProvider = ({ children }) => {
     }
   };
 
+  const reportDateFilters = useMemo(() => {
+    const { start, end } = getDateBounds(dateRangePreset);
+    return {
+      dateFrom: start.toISOString(),
+      dateTo: end.toISOString()
+    };
+  }, [dateRangePreset, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    if (!isReportRoute || activeReportTab !== 'sales' || typeof fetchOrdersPage !== 'function') return undefined;
+    let active = true;
+    const load = async () => {
+      const pageSize = 250;
+      const maxRows = 2000;
+      const rows = [];
+      for (let page = 1; rows.length < maxRows; page += 1) {
+        const result = await fetchOrdersPage({ page, pageSize, filters: reportDateFilters });
+        if (result.error || !active) return;
+        const batch = result.data || [];
+        rows.push(...batch);
+        if (batch.length < pageSize || rows.length >= Number(result.count || 0)) break;
+      }
+      if (active) setReportOrders(rows.slice(0, maxRows));
+    };
+    load();
+    return () => { active = false; };
+  }, [isReportRoute, activeReportTab, fetchOrdersPage, reportDateFilters]);
+
+  useEffect(() => {
+    if (!isReportRoute || activeReportTab !== 'materials' || typeof fetchStockLogsPage !== 'function') return undefined;
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      const pageSize = 250;
+      const maxRows = 2000;
+      const rows = [];
+      const databaseType = ['WASTE', 'ADJUST', 'IN', 'OUT'].includes(materialEventTypeFilter)
+        ? materialEventTypeFilter
+        : 'ALL';
+      const filters = {
+        ...reportDateFilters,
+        search: materialSearchTerm,
+        material: materialIdFilter,
+        type: databaseType
+      };
+      for (let page = 1; rows.length < maxRows; page += 1) {
+        const result = await fetchStockLogsPage({ page, pageSize, filters });
+        if (result.error || !active) return;
+        const batch = result.data || [];
+        rows.push(...batch);
+        if (batch.length < pageSize || rows.length >= Number(result.count || 0)) break;
+      }
+      if (active) setReportStockLogs(rows.slice(0, maxRows));
+    }, 350);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [
+    isReportRoute,
+    activeReportTab,
+    fetchStockLogsPage,
+    reportDateFilters,
+    materialSearchTerm,
+    materialIdFilter,
+    materialEventTypeFilter
+  ]);
+
   // Helper: Lookup Price per Unit of Raw Material
   const getMaterialPrice = (rawMaterialId) => {
     const found = rawMaterials.find(m => m.id === rawMaterialId);
@@ -166,12 +221,12 @@ export const ReportProvider = ({ children }) => {
 
     const { start, end } = getDateBounds(dateRangePreset);
 
-    return orders.filter(order => {
+    return reportOrders.filter(order => {
       const orderDate = new Date(order.date || order.createdAt || Date.now());
       if (orderDate < start || orderDate > end) return false;
       return true;
     });
-  }, [orders, isReportRoute, dateRangePreset, customStartDate, customEndDate]);
+  }, [reportOrders, isReportRoute, dateRangePreset, customStartDate, customEndDate]);
 
   // 2. DETAILED ENRICHED ORDERS (with individual HPP calculation)
   const enrichedOrders = useMemo(() => {
@@ -520,7 +575,7 @@ export const ReportProvider = ({ children }) => {
 
     const { start, end } = getDateBounds(dateRangePreset);
 
-    return stockLogs
+    return reportStockLogs
       .filter(log => {
         // Filter by date
         const logDate = new Date(log.createdAt || Date.now());
@@ -602,7 +657,7 @@ export const ReportProvider = ({ children }) => {
           badgeColor
         };
       });
-  }, [stockLogs, rawMaterials, isReportRoute, dateRangePreset, customStartDate, customEndDate, materialIdFilter, materialEventTypeFilter, materialSearchTerm]);
+  }, [reportStockLogs, rawMaterials, isReportRoute, dateRangePreset, customStartDate, customEndDate, materialIdFilter, materialEventTypeFilter, materialSearchTerm]);
 
   // 6. MATERIAL USAGE KPI SUMMARY
   const materialSummary = useMemo(() => {

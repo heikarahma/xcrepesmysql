@@ -1,8 +1,9 @@
 import { database, isDatabaseConfigured } from '../lib/database';
+import { stripImagesFromTransactionItems } from '../utils/imageCompression';
 
 const TABLE = 'orders';
 const DEFAULT_BRANCH_ID = 'BR-DEFAULT';
-const PAGE_SIZE = 1000;
+const PAGE_SIZE = 250;
 const ORDER_COLUMNS = [
   'id',
   'invoice_number',
@@ -30,7 +31,6 @@ const ORDER_COLUMNS = [
   'change_amount',
   'return_reason',
   'return_note',
-  'return_photo',
   'return_by',
   'returned_at',
   'created_at'
@@ -82,7 +82,7 @@ const mapOrderRow = (row) => {
     changeAmount: Number(row.change_amount) || 0,
     returnReason: row.return_reason || null,
     returnNote: row.return_note || null,
-    returnPhoto: row.return_photo || null,
+    returnPhoto: null,
     returnBy: row.return_by || null,
     returnedAt: row.returned_at || null,
     cancelReason: row.status === 'cancelled' ? (row.return_reason?.startsWith('[BATAL] ') ? row.return_reason.replace('[BATAL] ', '') : (row.return_reason || 'Dibatalkan oleh Admin')) : null,
@@ -171,7 +171,7 @@ const applyOrderPageFilters = (query, filters = {}, branchId, includeBranchFilte
 
 const fetchOrdersPage = async ({ branchId, page = 1, pageSize = 10, filters = {}, includeBranchFilter = true }) => {
   const safePage = Math.max(1, Number(page) || 1);
-  const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 10));
+  const safePageSize = Math.min(250, Math.max(1, Number(pageSize) || 10));
   const from = (safePage - 1) * safePageSize;
   const to = from + safePageSize - 1;
 
@@ -276,7 +276,7 @@ export const ordersService = {
       cashier_name: order.cashierName || 'Kasir',
       customer_name: order.customerName || 'Pelanggan Umum',
       table_number: order.tableNumber || '',
-      items: Array.isArray(order.items) ? order.items : [],
+      items: stripImagesFromTransactionItems(order.items),
       subtotal: Number(order.subtotal) || 0,
       items_discount_total: Number(order.itemsDiscountTotal) || 0,
       order_discount_type: order.orderDiscountType || 'none',
@@ -290,7 +290,6 @@ export const ordersService = {
       change_amount: Number(order.changeAmount) || 0,
       return_reason: order.returnReason || null,
       return_note: order.returnNote || null,
-      return_photo: order.returnPhoto || null,
       return_by: order.returnBy || null,
       returned_at: order.returnedAt || null,
       created_at: new Date().toISOString()
@@ -307,7 +306,7 @@ export const ordersService = {
     let { data, error } = await database
       .from(TABLE)
       .insert([fullPayload])
-      .select()
+      .select(ORDER_COLUMNS)
       .single();
 
     // Fallback if newer columns don't exist in remote orders table
@@ -316,7 +315,7 @@ export const ordersService = {
       const retry = await database
         .from(TABLE)
         .insert([fallbackBasePayload])
-        .select()
+        .select(ORDER_COLUMNS)
         .single();
       data = retry.data;
       error = retry.error;
@@ -359,7 +358,7 @@ export const ordersService = {
     };
   },
 
-  async updateOrderReturn(id, { reason, note, photo, user }) {
+  async updateOrderReturn(id, { reason, note, photo: _photo, user }) {
     if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const { data, error } = await database
       .from(TABLE)
@@ -367,12 +366,11 @@ export const ordersService = {
         status: 'returned',
         return_reason: reason,
         return_note: note || '',
-        return_photo: photo || null,
         return_by: user || 'Kasir',
         returned_at: new Date().toISOString()
       })
       .eq('id', id)
-      .select()
+      .select(ORDER_COLUMNS)
       .single();
 
     if (error) {
@@ -395,7 +393,7 @@ export const ordersService = {
         returned_at: new Date().toISOString()
       })
       .eq('id', id)
-      .select()
+      .select(ORDER_COLUMNS)
       .single();
 
     if (error) {
@@ -408,11 +406,15 @@ export const ordersService = {
 
   async updateOrder(id, payload) {
     if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
+    const cleanPayload = { ...payload };
+    if (cleanPayload.items) cleanPayload.items = stripImagesFromTransactionItems(cleanPayload.items);
+    delete cleanPayload.return_photo;
+    delete cleanPayload.returnPhoto;
     const { data, error } = await database
       .from(TABLE)
-      .update(payload)
+      .update(cleanPayload)
       .eq('id', id)
-      .select()
+      .select(ORDER_COLUMNS)
       .single();
 
     if (error) {

@@ -2,7 +2,7 @@ import { database, isDatabaseConfigured } from '../lib/database';
 
 const TABLE = 'inventory_stock_logs';
 const DEFAULT_BRANCH_ID = 'BR-DEFAULT';
-const PAGE_SIZE = 1000;
+const PAGE_SIZE = 250;
 const STOCK_LOG_COLUMNS = [
   'id',
   'raw_material_id',
@@ -107,7 +107,7 @@ const applyStockLogPageFilters = (query, filters = {}, branchId, includeBranchFi
   }
 
   if (material && material !== 'ALL') {
-    nextQuery = nextQuery.eq('raw_material_name', material);
+    nextQuery = nextQuery.eq('raw_material_id', material);
   }
 
   const q = String(search || '').trim().replace(/[(),]/g, ' ').replace(/\s+/g, ' ');
@@ -130,7 +130,7 @@ const applyStockLogPageFilters = (query, filters = {}, branchId, includeBranchFi
 
 const fetchStockLogsPage = async ({ branchId, page = 1, pageSize = 10, filters = {}, includeBranchFilter = true }) => {
   const safePage = Math.max(1, Number(page) || 1);
-  const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 10));
+  const safePageSize = Math.min(250, Math.max(1, Number(pageSize) || 10));
   const from = (safePage - 1) * safePageSize;
   const to = from + safePageSize - 1;
 

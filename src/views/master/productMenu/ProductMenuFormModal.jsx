@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { SearchSelect } from '../../components/SearchSelect';
 import { InitialsAvatar } from '../../components/InitialsAvatar';
+import { compressImageToWebP } from '../../../utils/imageCompression';
 
 export const ProductMenuFormModal = () => {
   const { 
@@ -115,26 +116,32 @@ export const ProductMenuFormModal = () => {
   // ----------------------------------------------------
   // HANDLERS
   // ----------------------------------------------------
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
     if (!validTypes.includes(file.type)) {
-      setErrors(prev => ({ ...prev, image: 'Format foto harus JPG, JPEG, atau PNG' }));
+      setErrors(prev => ({ ...prev, image: 'Format foto harus JPG, PNG, atau WEBP' }));
       return;
     }
-    if (file.size > 2 * 1024 * 1024) { 
-      setErrors(prev => ({ ...prev, image: 'Ukuran foto maksimal 2MB' }));
+    if (file.size > 8 * 1024 * 1024) {
+      setErrors(prev => ({ ...prev, image: 'Ukuran foto sumber maksimal 8MB' }));
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImage(reader.result);
+    try {
+      const compressed = await compressImageToWebP(file, {
+        maxWidth: 1200,
+        maxHeight: 1200,
+        quality: 0.8,
+        maxBytes: 300 * 1024
+      });
+      setImage(compressed);
       setErrors(prev => ({ ...prev, image: null }));
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      setErrors(prev => ({ ...prev, image: error.message || 'Gagal mengompresi foto.' }));
+    }
   };
 
   const handleRemoveImage = () => {

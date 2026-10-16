@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSettings } from '../../controllers/SettingsController';
 import { useUnit } from '../../controllers/UnitController';
 import { Button } from '../components/Button';
+import { compressImageToWebP } from '../../utils/imageCompression';
 import { 
   Store, 
   Receipt, 
@@ -284,7 +285,7 @@ export const SettingsView = () => {
     setIsSaved(false);
   };
 
-  const handleLogoUpload = (e) => {
+  const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -294,17 +295,23 @@ export const SettingsView = () => {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast('Ukuran file logo maksimal 2MB', 'error', 'File Terlalu Besar');
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('Ukuran file logo sumber maksimal 8MB', 'error', 'File Terlalu Besar');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      handleChange('logo', reader.result);
+    try {
+      const compressed = await compressImageToWebP(file, {
+        maxWidth: 1000,
+        maxHeight: 1000,
+        quality: 0.82,
+        maxBytes: 250 * 1024
+      });
+      handleChange('logo', compressed);
       showToast('Logo berhasil dimuat. Klik Simpan untuk menerapkan.', 'success', 'Logo Terpilih');
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      showToast(error.message || 'Logo gagal dikompresi.', 'error', 'Gagal Memproses Logo');
+    }
   };
 
   const handleRemoveLogo = () => {

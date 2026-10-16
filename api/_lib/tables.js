@@ -44,6 +44,7 @@ export const TABLES = {
   orders: {
     primaryKey: ['id'],
     columns: ['id', 'invoice_number', 'branch_id', 'date', 'status', 'cashier_name', 'customer_name', 'table_number', 'items', 'subtotal', 'items_discount_total', 'order_discount_type', 'order_discount_value', 'order_discount_amount', 'discount', 'enable_tax', 'tax_rate', 'tax_amount', 'tax_name', 'total_amount', 'total_items_count', 'payment_method', 'cash_received', 'change_amount', 'return_reason', 'return_note', 'return_photo', 'return_by', 'returned_at', 'created_at', 'updated_at'],
+    defaultColumns: ['id', 'invoice_number', 'branch_id', 'date', 'status', 'cashier_name', 'customer_name', 'table_number', 'items', 'subtotal', 'items_discount_total', 'order_discount_type', 'order_discount_value', 'order_discount_amount', 'discount', 'enable_tax', 'tax_rate', 'tax_amount', 'tax_name', 'total_amount', 'total_items_count', 'payment_method', 'cash_received', 'change_amount', 'return_reason', 'return_note', 'return_by', 'returned_at', 'created_at'],
     booleans: ['enable_tax'],
     json: ['items']
   },

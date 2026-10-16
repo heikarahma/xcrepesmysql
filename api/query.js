@@ -22,7 +22,9 @@ const MAX_BATCH_ROWS = 100;
 const MAX_FILTERS = 20;
 const MAX_IN_VALUES = 500;
 const MAX_OR_CONDITIONS = 20;
-const MAX_SELECT_ROWS = 2000;
+const MAX_SELECT_ROWS = 250;
+const DEFAULT_SELECT_ROWS = 100;
+const MAX_SELECT_COLUMNS = 30;
 
 const assertQueryComplexity = (body) => {
   if (Array.isArray(body.filters) && body.filters.length > MAX_FILTERS) {
@@ -44,16 +46,40 @@ const assertQueryComplexity = (body) => {
 };
 
 const parseColumns = (table, raw = '*') => {
-  if (!raw || raw === '*') return table.columns.filter((column) => !(table.secret || []).includes(column));
-  return String(raw)
+  const requested = (!raw || raw === '*')
+    ? (table.defaultColumns || table.columns)
+    : String(raw)
     .split(',')
     .map((column) => column.trim())
-    .filter(Boolean)
-    .map((column) => {
+    .filter(Boolean);
+  if (requested.length > MAX_SELECT_COLUMNS) {
+    throw Object.assign(new Error(`Kolom respons maksimal ${MAX_SELECT_COLUMNS} per request.`), { statusCode: 400 });
+  }
+  return requested.map((column) => {
       assertColumn(table, column);
       return column;
     })
     .filter((column) => !(table.secret || []).includes(column));
+};
+
+const stripTransactionImages = (value) => {
+  let items = value;
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items); } catch { return []; }
+  }
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => {
+    const { image, imageUrl, photo, thumbnail, ...cleanItem } = item || {};
+    return {
+      ...cleanItem,
+      toppings: Array.isArray(cleanItem.toppings)
+        ? cleanItem.toppings.map((topping) => {
+            const { image: toppingImage, imageUrl: toppingImageUrl, photo: toppingPhoto, ...cleanTopping } = topping || {};
+            return cleanTopping;
+          })
+        : []
+    };
+  });
 };
 
 const buildCondition = (table, filter, params) => {
@@ -114,7 +140,14 @@ const sanitizeInput = async (tableName, table, values) => {
         }
         continue;
       }
-      clean[column] = prepareValue(table, column, rawValue);
+      if (tableName === 'orders' && column === 'return_photo') {
+        clean[column] = null;
+        continue;
+      }
+      const safeValue = tableName === 'orders' && column === 'items'
+        ? stripTransactionImages(rawValue)
+        : rawValue;
+      clean[column] = prepareValue(table, column, safeValue);
     }
     return clean;
   }));
@@ -146,7 +179,7 @@ const executeSelect = async (db, tableName, table, body) => {
 
   let limit = body.limit
     ? Math.max(1, Math.min(MAX_SELECT_ROWS, Number(body.limit) || 1))
-    : (body.single || body.maybeSingle ? 1 : MAX_SELECT_ROWS);
+    : (body.single || body.maybeSingle ? 1 : DEFAULT_SELECT_ROWS);
   let offset = 0;
   if (body.range) {
     offset = Math.max(0, Number(body.range.from) || 0);
