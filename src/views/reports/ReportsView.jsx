@@ -14,14 +14,19 @@ import {
   ChevronRight, 
   ChevronDown,
   FileSpreadsheet,
-  FileText 
+  FileText,
+  Receipt,
+  ArrowLeft
 } from 'lucide-react';
 
 export const ReportsView = () => {
   const { activeMenu } = useNavigation();
-  const { currentUser } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
   const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'admin' || currentUser?.role === 'kepala_toko';
   const isCashier = currentUser?.role === 'kasir';
+  const canViewSales = typeof hasPermission === 'function' ? (hasPermission('reports-sales') || hasPermission('reports') || isSuperAdmin) : true;
+  const canViewMaterials = typeof hasPermission === 'function' ? (hasPermission('reports-materials') || hasPermission('reports') || isSuperAdmin) : true;
+
   const {
     activeReportTab,
     setActiveReportTab,
@@ -86,6 +91,18 @@ export const ReportsView = () => {
       {/* 1. TOP HEADER SECTION */}
       <div style={styles.headerSection}>
         <div>
+          {selectedOrder && (
+            <button
+              type="button"
+              onClick={() => setSelectedOrderDetailId(null)}
+              className="reports-back-btn"
+              style={styles.backBtn}
+              title="Kembali ke Riwayat Transaksi"
+            >
+              <ArrowLeft size={15} />
+              <span>Kembali ke Riwayat Transaksi</span>
+            </button>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <h1 style={styles.pageTitle}>
               {activeReportTab === 'sales' ? salesTitle : 'Laporan Pengurangan Bahan Baku'}
@@ -102,9 +119,66 @@ export const ReportsView = () => {
         </div>
       </div>
 
-      {/* 2. DATE RANGE PRESET FILTER BAR (DROPDOWN) & EXPORT ACTIONS */}
+      {/* 2. IN-PAGE SUB-NAVIGATION TABS */}
+      {!selectedOrder && (
+        <div className="reports-nav-tabs" style={styles.navTabs}>
+          {canViewSales && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveReportTab('sales');
+                  setActiveSalesSection('products');
+                }}
+                className={`reports-tab-btn ${activeReportTab === 'sales' && activeSalesSection === 'products' ? 'active' : ''}`}
+                style={{
+                  ...styles.tabBtn,
+                  ...(activeReportTab === 'sales' && activeSalesSection === 'products' ? styles.tabBtnActive : {})
+                }}
+              >
+                <BarChart3 size={15} />
+                <span>Summary Menu & Topping</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveReportTab('sales');
+                  setActiveSalesSection('transactions');
+                }}
+                className={`reports-tab-btn ${activeReportTab === 'sales' && activeSalesSection === 'transactions' ? 'active' : ''}`}
+                style={{
+                  ...styles.tabBtn,
+                  ...(activeReportTab === 'sales' && activeSalesSection === 'transactions' ? styles.tabBtnActive : {})
+                }}
+              >
+                <Receipt size={15} />
+                <span>Riwayat Transaksi Kasir</span>
+              </button>
+            </>
+          )}
+
+          {canViewMaterials && (
+            <button
+              type="button"
+              onClick={() => setActiveReportTab('materials')}
+              className={`reports-tab-btn ${activeReportTab === 'materials' ? 'active' : ''}`}
+              style={{
+                ...styles.tabBtn,
+                ...(activeReportTab === 'materials' ? styles.tabBtnActive : {})
+              }}
+            >
+              <Package size={15} />
+              <span>Audit Pengurangan Bahan</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 3. DATE RANGE PRESET FILTER BAR (DROPDOWN) & EXPORT ACTIONS */}
       {!selectedOrder && (
         <div className="reports-date-filter-card" style={styles.dateFilterCard}>
+
           <div className="reports-date-filter-left" style={styles.dateFilterLeft}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--neutral-700)', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>
               <Calendar size={16} color="var(--blue-500)" />
@@ -291,7 +365,52 @@ const styles = {
     maxWidth: '750px',
     lineHeight: 1.5
   },
+  navTabs: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    backgroundColor: '#F1F5F9',
+    padding: '4px',
+    borderRadius: '10px',
+    flexWrap: 'wrap',
+    width: 'fit-content'
+  },
+  tabBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '7px',
+    padding: '8px 14px',
+    borderRadius: '8px',
+    fontSize: '0.813rem',
+    fontWeight: 600,
+    border: 'none',
+    backgroundColor: 'transparent',
+    color: '#64748B',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease'
+  },
+  tabBtnActive: {
+    backgroundColor: '#FFFFFF',
+    color: '#0F172A',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)'
+  },
+  backBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    border: '1px solid var(--border-color)',
+    backgroundColor: 'var(--bg-surface, #FFFFFF)',
+    color: 'var(--neutral-700)',
+    fontSize: '12px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginBottom: '10px',
+    transition: 'all 0.15s ease'
+  },
   dateFilterCard: {
+
     backgroundColor: '#FFFFFF',
     border: '1px solid var(--border-color)',
     borderRadius: '12px',

@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "db:setup": "node scripts/setup-mysql.mjs",
     "db:migrate": "node scripts/migrate-supabase-to-mysql.mjs",
+    "db:check": "node scripts/test-db-connection.mjs",
+    "test:checkout": "node scripts/test-atomic-checkout.mjs",
     "dev:vercel": "npx vercel dev"
   },
   "dependencies": {
