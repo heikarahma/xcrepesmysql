@@ -7,7 +7,7 @@ import {
   checkMenuAvailability,
   checkToppingAvailability
 } from '../models';
-import { useRawMaterial } from './RawMaterialController';
+import { useRawMaterial, calculateOrderDeductions } from './RawMaterialController';
 import { useProductMenu } from './ProductMenuController';
 import { useTopping } from './ToppingController';
 import { useUnit } from './UnitController';
@@ -31,6 +31,7 @@ export const OrderProvider = ({ children }) => {
   const { 
     rawMaterials = [], 
     deductMaterialsForOrder, 
+    applyAuthoritativeStockUpdates,
     restoreMaterialsForOrder, 
     recordOrderReturnLog,
     deductMaterialsForRemake,
@@ -651,21 +652,34 @@ export const OrderProvider = ({ children }) => {
 
     setIsSubmitting(true);
     try {
-      const { data: createdOrder, error: orderErr } = await ordersService.createOrder(orderData);
-      if (orderErr) {
-        showToast(`Gagal menyimpan pesanan: ${orderErr.message}`, 'error', 'Error Database');
+      // Calculate material deductions for atomic checkout transaction
+      const deductions = typeof calculateOrderDeductions === 'function'
+        ? calculateOrderDeductions(orderData, productMenus || [], toppings || [])
+        : [];
+
+      const { data: checkoutResult, error: checkoutErr } = await ordersService.checkoutOrder(orderData, deductions);
+      if (checkoutErr) {
+        showToast(`Gagal menyimpan pesanan: ${checkoutErr.message}`, 'error', 'Error Transaksi');
         return null;
       }
 
-      setOrders(prev => [createdOrder || orderData, ...prev]);
+      const createdOrder = checkoutResult?.order || orderData;
+      setOrders(prev => [createdOrder, ...prev]);
 
-      // Auto-deduct raw materials based on recipes & toppings in cloud database
-      try {
-        if (typeof deductMaterialsForOrder === 'function') {
-          await deductMaterialsForOrder(orderData, productMenus || [], toppings || []);
+      // Apply authoritative stock & logs from atomic backend transaction
+      if (checkoutResult?.updatedStocks?.length > 0 || checkoutResult?.stockLogs?.length > 0) {
+        if (typeof applyAuthoritativeStockUpdates === 'function') {
+          applyAuthoritativeStockUpdates(checkoutResult.updatedStocks, checkoutResult.stockLogs);
         }
-      } catch (e) {
-        console.error('Failed to deduct raw materials for order', e);
+      } else {
+        // Fallback for legacy offline / local deduction
+        try {
+          if (typeof deductMaterialsForOrder === 'function') {
+            await deductMaterialsForOrder(orderData, productMenus || [], toppings || []);
+          }
+        } catch (e) {
+          console.error('Failed to deduct raw materials for order', e);
+        }
       }
 
       // Reset current active cart
@@ -682,6 +696,7 @@ export const OrderProvider = ({ children }) => {
       setIsSubmitting(false);
     }
   };
+
 
   // Record Order Return (Retur Pesanan: Remake / Buat Baru atau Refund / Batal)
   const recordOrderReturn = async ({ 

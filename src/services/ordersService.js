@@ -1,5 +1,6 @@
-import { database, isDatabaseConfigured } from '../lib/database';
+import { database, isDatabaseConfigured, apiPost } from '../lib/database';
 import { stripImagesFromTransactionItems } from '../utils/imageCompression';
+
 
 const TABLE = 'orders';
 const DEFAULT_BRANCH_ID = 'BR-DEFAULT';
@@ -265,7 +266,25 @@ export const ordersService = {
     };
   },
 
+  async checkoutOrder(order, deductions = []) {
+    if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
+    const response = await apiPost('/api/checkout', { order, deductions });
+    if (response.error) {
+      // If atomic checkout endpoint is unavailable (e.g. 404), fallback to standard createOrder
+      if (response.error.message && response.error.message.includes('404')) {
+        const fallback = await this.createOrder(order);
+        return {
+          data: fallback.data ? { order: fallback.data, updatedStocks: [], stockLogs: [] } : null,
+          error: fallback.error
+        };
+      }
+      return { data: null, error: new Error(response.error.message || 'Gagal memproses checkout') };
+    }
+    return { data: response.data, error: null };
+  },
+
   async createOrder(order) {
+
     if (!isDatabaseConfigured()) return { data: null, error: new Error('MySQL not configured') };
     const basePayload = {
       id: order.id,

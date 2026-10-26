@@ -1,7 +1,6 @@
-import { DUMMY_RAW_MATERIALS, DUMMY_STOCK_LOGS } from '../utils/dummyData';
+export const INITIAL_RAW_MATERIALS = [];
+export const INITIAL_STOCK_LOGS = [];
 
-export const INITIAL_RAW_MATERIALS = DUMMY_RAW_MATERIALS;
-export const INITIAL_STOCK_LOGS = DUMMY_STOCK_LOGS;
 
 export const RAW_MATERIAL_STORAGE_KEY = 'master_raw_materials';
 export const STOCK_LOGS_STORAGE_KEY = 'inventory_stock_logs';

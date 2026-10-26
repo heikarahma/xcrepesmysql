@@ -20,7 +20,58 @@ export const useRawMaterial = () => {
 
 export const useRawMaterialController = useRawMaterial;
 
+export const calculateOrderDeductions = (orderData, menus = [], toppings = []) => {
+  if (!orderData || !Array.isArray(orderData.items) || orderData.items.length === 0) {
+    return [];
+  }
+
+  const deductionsToApply = [];
+
+  orderData.items.forEach(item => {
+    const itemQty = Number(item.quantity) || 1;
+    const matchedMenu = (menus || []).find(m => m.id === item.menuId);
+    const menuIngredients = (matchedMenu && matchedMenu.ingredients) || (item.ingredients) || [];
+
+    menuIngredients.forEach(ing => {
+      const requiredQty = (Number(ing.quantity) || 0) * itemQty;
+      if (requiredQty > 0 && ing.rawMaterialId) {
+        deductionsToApply.push({
+          rawMaterialId: ing.rawMaterialId,
+          amount: requiredQty,
+          item: { name: item.name, quantity: itemQty },
+          isTopping: false,
+          toppingName: null
+        });
+      }
+    });
+
+    if (Array.isArray(item.toppings)) {
+      item.toppings.forEach(t => {
+        const matchedTopping = (toppings || []).find(top => top.id === (t.id || t.toppingId));
+        const toppingIngredients = (matchedTopping && matchedTopping.ingredients) || [];
+        const toppingQty = Number(t.quantity) || 1;
+
+        toppingIngredients.forEach(ting => {
+          const requiredQty = (Number(ting.quantity) || 0) * toppingQty * itemQty;
+          if (requiredQty > 0 && ting.rawMaterialId) {
+            deductionsToApply.push({
+              rawMaterialId: ting.rawMaterialId,
+              amount: requiredQty,
+              item: { name: item.name, quantity: itemQty },
+              isTopping: true,
+              toppingName: t.name || matchedTopping?.name || 'Extra Topping'
+            });
+          }
+        });
+      });
+    }
+  });
+
+  return deductionsToApply;
+};
+
 export const RawMaterialProvider = ({ children }) => {
+
   const { showToast, units } = useUnit();
   const { currentUser } = useAuth();
   const isCashier = currentUser?.role === 'kasir';
@@ -688,57 +739,28 @@ export const RawMaterialProvider = ({ children }) => {
     }
   };
 
+  const applyAuthoritativeStockUpdates = useCallback((updatedStocks = [], newLogs = []) => {
+    if (Array.isArray(updatedStocks) && updatedStocks.length > 0) {
+      setRawMaterials(prev => prev.map(m => {
+        const found = updatedStocks.find(s => s.id === m.id);
+        if (found) {
+          return { ...m, stock: found.stock, currentStock: found.stock, updatedAt: new Date().toISOString() };
+        }
+        return m;
+      }));
+    }
+    if (Array.isArray(newLogs) && newLogs.length > 0) {
+      setStockLogs(prev => [...newLogs, ...prev]);
+    }
+  }, []);
+
   // C.4 Deduct Materials for Completed Order
   const deductMaterialsForOrder = async (orderData, menus = [], toppings = []) => {
-    if (!orderData || !Array.isArray(orderData.items) || orderData.items.length === 0) {
-      return { success: false, deductionsCount: 0 };
-    }
-
-    const deductionsToApply = [];
-
-    orderData.items.forEach(item => {
-      const itemQty = Number(item.quantity) || 1;
-      const matchedMenu = menus.find(m => m.id === item.menuId);
-      const menuIngredients = (matchedMenu && matchedMenu.ingredients) || (item.ingredients) || [];
-
-      menuIngredients.forEach(ing => {
-        const requiredQty = (Number(ing.quantity) || 0) * itemQty;
-        if (requiredQty > 0 && ing.rawMaterialId) {
-          deductionsToApply.push({
-            rawMaterialId: ing.rawMaterialId,
-            amount: requiredQty,
-            item,
-            isTopping: false,
-            toppingName: null
-          });
-        }
-      });
-
-      if (Array.isArray(item.toppings)) {
-        item.toppings.forEach(t => {
-          const matchedTopping = toppings.find(top => top.id === (t.id || t.toppingId));
-          const toppingIngredients = (matchedTopping && matchedTopping.ingredients) || [];
-          const toppingQty = Number(t.quantity) || 1;
-
-          toppingIngredients.forEach(ting => {
-            const requiredQty = (Number(ting.quantity) || 0) * toppingQty * itemQty;
-            if (requiredQty > 0 && ting.rawMaterialId) {
-              deductionsToApply.push({
-                rawMaterialId: ting.rawMaterialId,
-                amount: requiredQty,
-                item,
-                isTopping: true,
-                toppingName: t.name || matchedTopping?.name || 'Extra Topping'
-              });
-            }
-          });
-        });
-      }
-    });
-
+    const deductionsToApply = calculateOrderDeductions(orderData, menus, toppings);
     if (deductionsToApply.length === 0) {
       return { success: true, deductionsCount: 0 };
     }
+
 
     const newLogs = [];
     const stockUpdates = [];
@@ -2210,7 +2232,9 @@ export const RawMaterialProvider = ({ children }) => {
         adjustStock,
         recordMaterialWaste,
         deductMaterialsForOrder,
+        applyAuthoritativeStockUpdates,
         restoreMaterialsForOrder,
+
         calculateIngredientsForItems,
         deductMaterialsForRemake,
         recordOrderRefundLog,

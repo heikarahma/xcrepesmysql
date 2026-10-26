@@ -1,7 +1,6 @@
-import { DUMMY_TOPPINGS } from '../utils/dummyData';
-
-export const INITIAL_TOPPINGS = DUMMY_TOPPINGS;
+export const INITIAL_TOPPINGS = [];
 export const TOPPING_STORAGE_KEY = 'master_toppings';
+
 
 /**
  * Memeriksa ketersediaan stok bahan baku untuk suatu extra topping.

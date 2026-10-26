@@ -53,6 +53,12 @@ export const loginToDatabase = async (username, password) => request('/api/auth/
   body: JSON.stringify({ username, password })
 });
 
+export const apiPost = async (path, body) => request(path, {
+  method: 'POST',
+  body: JSON.stringify(body)
+});
+
+
 class QueryBuilder {
   constructor(table) {
     this.payload = {

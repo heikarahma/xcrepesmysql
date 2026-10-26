@@ -1,7 +1,6 @@
-import { DUMMY_PRODUCT_MENUS } from '../utils/dummyData';
-
-export const INITIAL_PRODUCT_MENUS = DUMMY_PRODUCT_MENUS;
+export const INITIAL_PRODUCT_MENUS = [];
 export const PRODUCT_MENU_STORAGE_KEY = 'master_product_menus';
+
 
 /**
  * Memeriksa ketersediaan stok bahan baku untuk suatu menu.
